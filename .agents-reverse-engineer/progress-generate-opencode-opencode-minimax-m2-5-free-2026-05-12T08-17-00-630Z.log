@@ -1,0 +1,340 @@
+=== ARE Generate (2026-05-12T08:17:00.630Z) ===
+Project: /home/suser/DEVs/GITs/GITHUBs/citadelgrad-pascals-discrete-attractor
+Files: 130 | Directories: 32
+
+[1/130] ANALYZING crates/attractor-pipeline/src/handlers/codergen_handler.rs
+[2/130] ANALYZING crates/attractor-pipeline/src/handlers/manager.rs
+[3/130] ANALYZING crates/attractor-pipeline/src/handlers/mod.rs
+[4/130] ANALYZING crates/attractor-pipeline/src/handlers/parallel.rs
+[5/130] ANALYZING crates/attractor-pipeline/src/handlers/tool_handler.rs
+[6/130] ANALYZING crates/attractor-pipeline/src/handlers/wait_human.rs
+[7/130] ANALYZING crates/attractor-cli/src/commands/decompose.rs
+[1/130] DONE crates/attractor-pipeline/src/handlers/mod.rs 21.7s 14457/591 tok unknown
+[8/130] ANALYZING crates/attractor-cli/src/commands/generate.rs
+[2/130] DONE crates/attractor-cli/src/commands/decompose.rs 29.1s 18731/1227 tok unknown ~54m 12s remaining
+[9/130] ANALYZING crates/attractor-cli/src/commands/generate.rs.bak
+[3/130] DONE crates/attractor-pipeline/src/handlers/tool_handler.rs 30.2s 16146/986 tok unknown ~57m 11s remaining
+[10/130] ANALYZING crates/attractor-cli/src/commands/info.rs
+[4/130] DONE crates/attractor-pipeline/src/handlers/parallel.rs 32.2s 15193/840 tok unknown ~59m 27s remaining
+[11/130] ANALYZING crates/attractor-cli/src/commands/launch.rs
+[5/130] DONE crates/attractor-cli/src/commands/info.rs 17.5s 14328/485 tok unknown ~54m 29s remaining
+[12/130] ANALYZING crates/attractor-cli/src/commands/mod.rs
+[6/130] DONE crates/attractor-cli/src/commands/generate.rs.bak 19.1s 19537/1162 tok unknown ~51m 36s remaining
+[13/130] ANALYZING crates/attractor-cli/src/commands/plan.rs
+[7/130] DONE crates/attractor-pipeline/src/handlers/wait_human.rs 58.5s 15599/664 tok unknown ~61m 1s remaining
+[14/130] ANALYZING crates/attractor-cli/src/commands/run.rs
+[8/130] DONE crates/attractor-cli/src/commands/mod.rs 12.8s 14193/408 tok unknown ~56m 12s remaining
+[15/130] ANALYZING crates/attractor-cli/src/commands/scaffold.rs
+[9/130] DONE crates/attractor-pipeline/src/handlers/manager.rs 62.9s 14906/793 tok unknown ~63m 39s remaining
+[16/130] ANALYZING crates/attractor-cli/src/commands/validate.rs
+[10/130] DONE crates/attractor-cli/src/commands/plan.rs 22.0s 15036/686 tok unknown ~61m 12s remaining
+[17/130] ANALYZING crates/attractor-tools/src/builtin/edit_file.rs
+[11/130] DONE crates/attractor-cli/src/commands/launch.rs 38.3s 14791/891 tok unknown ~64m 0s remaining
+[18/130] ANALYZING crates/attractor-tools/src/builtin/glob.rs
+[12/130] DONE crates/attractor-cli/src/commands/validate.rs 11.3s 14267/480 tok unknown ~59m 56s remaining
+[19/130] ANALYZING crates/attractor-tools/src/builtin/grep.rs
+[13/130] DONE crates/attractor-cli/src/commands/generate.rs 53.5s 20048/1352 tok unknown ~63m 58s remaining
+[20/130] ANALYZING crates/attractor-tools/src/builtin/mod.rs
+[14/130] DONE crates/attractor-cli/src/commands/run.rs 22.4s 15999/750 tok unknown ~61m 31s remaining
+[21/130] ANALYZING crates/attractor-tools/src/builtin/read_file.rs
+[15/130] DONE crates/attractor-cli/src/commands/scaffold.rs 32.6s 14910/763 tok unknown ~63m 53s remaining
+[22/130] ANALYZING crates/attractor-tools/src/builtin/shell.rs
+[16/130] DONE crates/attractor-tools/src/builtin/grep.rs 34.6s 14621/920 tok unknown ~66m 17s remaining
+[23/130] ANALYZING crates/attractor-tools/src/builtin/write_file.rs
+[17/130] DONE crates/attractor-tools/src/builtin/read_file.rs 31.5s 14708/724 tok unknown ~60m 37s remaining
+[24/130] ANALYZING crates/attractor-web/public/js/xterm-setup.js
+[18/130] DONE crates/attractor-tools/src/builtin/edit_file.rs 46.4s 15007/766 tok unknown ~66m 21s remaining
+[25/130] ANALYZING crates/attractor-web/src/components/approval_bar.rs
+[19/130] DONE crates/attractor-pipeline/src/handlers/codergen_handler.rs 117.9s 21496/2117 tok unknown ~75m 56s remaining
+[26/130] ANALYZING crates/attractor-web/src/components/document_viewer.rs
+[20/130] DONE crates/attractor-tools/src/builtin/glob.rs 51.6s 14525/717 tok unknown ~80m 41s remaining
+[27/130] ANALYZING crates/attractor-web/src/components/execution_node.rs
+[21/130] DONE crates/attractor-web/public/js/xterm-setup.js 16.1s 15486/864 tok unknown ~75m 54s remaining
+[28/130] ANALYZING crates/attractor-web/src/components/execution_panel.rs
+[22/130] DONE crates/attractor-tools/src/builtin/write_file.rs 28.0s 14492/536 tok unknown ~78m 13s remaining
+[29/130] ANALYZING crates/attractor-web/src/components/folder_picker.rs
+[23/130] DONE crates/attractor-web/src/components/approval_bar.rs 25.3s 14545/661 tok unknown ~72m 28s remaining
+[30/130] ANALYZING crates/attractor-web/src/components/layout.rs
+[24/130] DONE crates/attractor-tools/src/builtin/shell.rs 49.6s 14518/720 tok unknown ~76m 36s remaining
+[31/130] ANALYZING crates/attractor-web/src/components/markdown_render.rs
+[25/130] DONE crates/attractor-web/src/components/document_viewer.rs 27.7s 15609/368 tok unknown ~75m 1s remaining
+[32/130] ANALYZING crates/attractor-web/src/components/mod.rs
+[26/130] DONE crates/attractor-web/src/components/execution_node.rs 24.0s 14497/651 tok unknown ~72m 28s remaining
+[33/130] ANALYZING crates/attractor-web/src/components/project_sidebar.rs
+[27/130] DONE crates/attractor-web/src/components/markdown_render.rs 13.3s 14258/181 tok unknown ~68m 38s remaining
+[34/130] ANALYZING crates/attractor-web/src/components/terminal.rs
+[28/130] DONE crates/attractor-web/src/components/folder_picker.rs 24.6s 15798/1066 tok unknown ~64m 15s remaining
+[35/130] ANALYZING crates/attractor-web/src/server/db.rs
+[29/130] DONE crates/attractor-web/src/components/execution_panel.rs 34.2s 15286/669 tok unknown ~49m 32s remaining
+[36/130] ANALYZING crates/attractor-web/src/server/documents.rs
+[30/130] DONE crates/attractor-web/src/components/project_sidebar.rs 20.5s 14972/868 tok unknown ~43m 51s remaining
+[37/130] ANALYZING crates/attractor-web/src/server/execute.rs
+[31/130] DONE crates/attractor-web/src/components/terminal.rs 15.6s 14658/680 tok unknown ~43m 20s remaining
+[38/130] ANALYZING crates/attractor-web/src/server/mod.rs
+[32/130] DONE crates/attractor-web/src/components/layout.rs 31.4s 14810/499 tok unknown ~43m 27s remaining
+[39/130] ANALYZING crates/attractor-web/src/server/projects.rs
+[33/130] DONE crates/attractor-web/src/server/mod.rs 8.9s 14277/615 tok unknown ~40m 21s remaining
+[40/130] ANALYZING crates/attractor-web/src/server/stream.rs
+[34/130] DONE crates/attractor-web/src/server/documents.rs 18.7s 15792/831 tok unknown ~35m 0s remaining
+[41/130] ANALYZING crates/attractor-web/src/server/terminal.rs
+[35/130] DONE crates/attractor-web/src/server/db.rs 23.8s 17965/791 tok unknown ~34m 2s remaining
+[42/130] ANALYZING crates/attractor-agent/src/fidelity.rs
+[36/130] DONE crates/attractor-web/src/server/execute.rs 20.1s 16693/643 tok unknown ~33m 3s remaining
+[43/130] ANALYZING crates/attractor-agent/src/lib.rs
+[37/130] DONE crates/attractor-tools/src/builtin/mod.rs 123.1s 51049/1254 tok unknown ~49m 43s remaining
+[44/130] ANALYZING crates/attractor-agent/src/loop_detection.rs
+[38/130] DONE crates/attractor-agent/src/fidelity.rs 24.5s 15304/735 tok unknown ~49m 10s remaining
+[45/130] ANALYZING crates/attractor-agent/src/prompt_builder.rs
+[39/130] DONE crates/attractor-web/src/server/stream.rs 36.7s 15562/854 tok unknown ~49m 1s remaining
+[46/130] ANALYZING crates/attractor-agent/src/subagent.rs
+[40/130] DONE crates/attractor-web/src/server/terminal.rs 46.5s 16689/649 tok unknown ~52m 23s remaining
+[47/130] ANALYZING crates/attractor-agent/src/test_utils.rs
+[41/130] DONE crates/attractor-web/src/server/projects.rs 56.0s 16700/1067 tok unknown ~57m 48s remaining
+[48/130] ANALYZING crates/attractor-cli/src/main.rs
+[42/130] DONE crates/attractor-agent/src/lib.rs 48.5s 19986/1639 tok unknown ~59m 40s remaining
+[49/130] ANALYZING crates/attractor-pipeline/src/checkpoint.rs
+[43/130] DONE crates/attractor-web/src/components/mod.rs 93.4s 14143/1768 tok unknown ~71m 14s remaining
+[50/130] ANALYZING crates/attractor-pipeline/src/condition.rs
+[44/130] DONE crates/attractor-agent/src/subagent.rs 25.2s 15211/694 tok unknown ~71m 20s remaining
+[51/130] ANALYZING crates/attractor-pipeline/src/edge_selection.rs
+[45/130] DONE crates/attractor-agent/src/loop_detection.rs 46.0s 15638/599 tok unknown ~73m 39s remaining
+[52/130] ANALYZING crates/attractor-pipeline/src/engine.rs
+[46/130] DONE crates/attractor-cli/src/main.rs 17.1s 16567/612 tok unknown ~72m 23s remaining
+[53/130] ANALYZING crates/attractor-pipeline/src/events.rs
+[47/130] DONE crates/attractor-agent/src/test_utils.rs 22.2s 15302/690 tok unknown ~57m 34s remaining
+[54/130] ANALYZING crates/attractor-pipeline/src/goal_gate.rs
+[48/130] DONE crates/attractor-pipeline/src/checkpoint.rs 15.5s 15804/486 tok unknown ~55m 39s remaining
+[55/130] ANALYZING crates/attractor-pipeline/src/graph.rs
+[49/130] DONE crates/attractor-pipeline/src/edge_selection.rs 17.6s 15905/710 tok unknown ~52m 24s remaining
+[56/130] ANALYZING crates/attractor-pipeline/src/handler.rs
+[50/130] DONE crates/attractor-pipeline/src/goal_gate.rs 16.1s 16035/583 tok unknown ~47m 42s remaining
+[57/130] ANALYZING crates/attractor-pipeline/src/interviewer.rs
+[51/130] DONE crates/attractor-pipeline/src/events.rs 20.3s 15127/778 tok unknown ~42m 25s remaining
+[58/130] ANALYZING crates/attractor-pipeline/src/lib.rs
+[52/130] DONE crates/attractor-agent/src/prompt_builder.rs 64.5s 16465/983 tok unknown ~43m 57s remaining
+[59/130] ANALYZING crates/attractor-pipeline/src/retry.rs
+[53/130] DONE crates/attractor-pipeline/src/condition.rs 35.9s 16092/747 tok unknown ~36m 1s remaining
+[60/130] ANALYZING crates/attractor-pipeline/src/stylesheet.rs
+[54/130] DONE crates/attractor-pipeline/src/engine.rs 31.0s 20309/1314 tok unknown ~36m 17s remaining
+[61/130] ANALYZING crates/attractor-pipeline/src/transforms.rs
+[55/130] DONE crates/attractor-pipeline/src/handler.rs 23.6s 16474/1031 tok unknown ~33m 0s remaining
+[62/130] ANALYZING crates/attractor-pipeline/src/validation.rs
+[56/130] DONE crates/attractor-pipeline/src/lib.rs 17.2s 14460/975 tok unknown ~32m 34s remaining
+[63/130] ANALYZING crates/attractor-pipeline/tests/integration.rs
+[57/130] DONE crates/attractor-pipeline/src/retry.rs 19.4s 16532/641 tok unknown ~31m 46s remaining
+[64/130] ANALYZING crates/attractor-llm/src/anthropic.rs
+[58/130] DONE crates/attractor-pipeline/src/graph.rs 46.2s 17409/768 tok unknown ~35m 1s remaining
+[65/130] ANALYZING crates/attractor-llm/src/client.rs
+[59/130] DONE crates/attractor-pipeline/src/stylesheet.rs 22.4s 17439/976 tok unknown ~35m 6s remaining
+[66/130] ANALYZING crates/attractor-llm/src/gemini.rs
+[60/130] DONE crates/attractor-pipeline/src/transforms.rs 25.8s 15581/595 tok unknown ~35m 44s remaining
+[67/130] ANALYZING crates/attractor-llm/src/lib.rs
+[61/130] DONE crates/attractor-pipeline/src/interviewer.rs 44.2s 15289/728 tok unknown ~37m 58s remaining
+[68/130] ANALYZING crates/attractor-llm/src/openai.rs
+[62/130] DONE crates/attractor-pipeline/src/validation.rs 27.6s 20008/1151 tok unknown ~33m 14s remaining
+[69/130] ANALYZING crates/attractor-llm/src/provider.rs
+[63/130] DONE crates/attractor-pipeline/tests/integration.rs 32.6s 19528/1180 tok unknown ~32m 22s remaining
+[70/130] ANALYZING crates/attractor-llm/src/types.rs
+[64/130] DONE crates/attractor-llm/src/gemini.rs 30.1s 18768/1382 tok unknown ~31m 47s remaining
+[71/130] ANALYZING crates/attractor-dot/src/ast.rs
+[65/130] DONE crates/attractor-llm/src/provider.rs 29.5s 15210/704 tok unknown ~31m 57s remaining
+[72/130] ANALYZING crates/attractor-dot/src/duration_serde.rs
+[66/130] DONE crates/attractor-llm/src/lib.rs 50.4s 14275/566 tok unknown ~35m 0s remaining
+[73/130] ANALYZING crates/attractor-dot/src/lib.rs
+[67/130] DONE crates/attractor-dot/src/lib.rs 23.1s 16523/806 tok unknown ~34m 51s remaining
+[74/130] ANALYZING crates/attractor-dot/src/parser.rs
+[68/130] DONE crates/attractor-llm/src/types.rs 59.9s 16830/956 tok unknown ~35m 42s remaining
+[75/130] ANALYZING crates/attractor-types/src/lib.rs
+[69/130] DONE crates/attractor-llm/src/client.rs 80.4s 18019/842 tok unknown ~41m 1s remaining
+[76/130] ANALYZING crates/attractor-tools/src/environment.rs
+[70/130] DONE crates/attractor-llm/src/anthropic.rs 87.7s 19137/1627 tok unknown ~46m 33s remaining
+[77/130] ANALYZING crates/attractor-tools/src/lib.rs
+[71/130] DONE crates/attractor-dot/src/ast.rs 60.0s 14401/914 tok unknown ~47m 19s remaining
+[78/130] ANALYZING crates/attractor-tools/src/local_env.rs
+[72/130] DONE crates/attractor-dot/src/duration_serde.rs 55.0s 14538/731 tok unknown ~49m 10s remaining
+[79/130] ANALYZING crates/attractor-tools/src/profiles.rs
+[73/130] DONE crates/attractor-tools/src/lib.rs 28.5s 16585/1185 tok unknown ~47m 56s remaining
+[80/130] ANALYZING crates/attractor-tools/src/tool.rs
+[74/130] DONE crates/attractor-llm/src/openai.rs 106.9s 38896/1502 tok unknown ~54m 16s remaining
+[81/130] ANALYZING crates/attractor-tools/src/truncation.rs
+[75/130] DONE crates/attractor-tools/src/environment.rs 46.2s 14534/603 tok unknown ~54m 49s remaining
+[82/130] ANALYZING crates/attractor-web/src/app.rs
+[76/130] DONE crates/attractor-tools/src/tool.rs 19.2s 14506/500 tok unknown ~51m 1s remaining
+[83/130] ANALYZING crates/attractor-web/src/lib.rs
+[77/130] DONE crates/attractor-types/src/lib.rs 58.0s 19814/1059 tok unknown ~53m 9s remaining
+[84/130] ANALYZING crates/attractor-web/src/main.rs
+[78/130] DONE crates/attractor-tools/src/truncation.rs 22.2s 14923/712 tok unknown ~48m 53s remaining
+[85/130] ANALYZING crates/attractor-web/style/main.scss
+[79/130] DONE crates/attractor-tools/src/profiles.rs 47.4s 14899/766 tok unknown ~45m 9s remaining
+[86/130] ANALYZING crates/attractor-agent/Cargo.toml
+[80/130] DONE crates/attractor-dot/src/parser.rs 69.1s 18679/1203 tok unknown ~42m 42s remaining
+[87/130] ANALYZING crates/attractor-cli/Cargo.toml
+[81/130] DONE crates/attractor-tools/src/local_env.rs 67.1s 17700/1478 tok unknown ~42m 26s remaining
+[88/130] ANALYZING crates/attractor-pipeline/Cargo.toml
+[82/130] DONE crates/attractor-web/src/app.rs 38.5s 14589/759 tok unknown ~40m 15s remaining
+[89/130] ANALYZING crates/attractor-llm/Cargo.toml
+[83/130] DONE crates/attractor-web/src/main.rs 30.6s 14860/907 tok unknown ~39m 34s remaining
+[90/130] ANALYZING crates/attractor-dot/Cargo.toml
+[84/130] DONE crates/attractor-cli/Cargo.toml 24.9s 14309/732 tok unknown ~32m 27s remaining
+[91/130] ANALYZING crates/attractor-tools/Cargo.toml
+[85/130] DONE crates/attractor-pipeline/Cargo.toml 17.8s 14346/623 tok unknown ~29m 37s remaining
+[92/130] ANALYZING crates/attractor-types/Cargo.toml
+[86/130] DONE crates/attractor-llm/Cargo.toml 17.9s 14247/505 tok unknown ~28m 51s remaining
+[93/130] ANALYZING crates/attractor-web/Cargo.toml
+[87/130] DONE crates/attractor-web/src/lib.rs 51.7s 46312/968 tok unknown ~27m 45s remaining
+[94/130] ANALYZING crates/attractor-web/Leptos.toml
+[88/130] DONE crates/attractor-types/Cargo.toml 13.1s 14204/446 tok unknown ~26m 28s remaining
+[95/130] ANALYZING crates/attractor-web/package.json
+[89/130] DONE crates/attractor-tools/Cargo.toml 17.6s 14228/426 tok unknown ~23m 48s remaining
+[96/130] ANALYZING docs/examples/epic-runner.dot
+[90/130] DONE crates/attractor-web/package.json 14.4s 14147/341 tok unknown ~19m 34s remaining
+[97/130] ANALYZING docs/plans/2026-04-09-feat-reckoner-software-factory-plan.md
+[91/130] DONE crates/attractor-web/style/main.scss 63.3s 18530/1776 tok unknown ~18m 50s remaining
+[98/130] ANALYZING docs/plans/2026-04-14-fix-codebase-audit-outstanding-issues.md
+[92/130] DONE crates/attractor-web/Leptos.toml 23.0s 14245/357 tok unknown ~17m 22s remaining
+[99/130] ANALYZING .vscode/settings.json
+[93/130] DONE docs/examples/epic-runner.dot 18.5s 15149/939 tok unknown ~16m 9s remaining
+[100/130] ANALYZING .tldr/languages.json
+[94/130] DONE crates/attractor-dot/Cargo.toml 49.1s 14177/761 tok unknown ~17m 10s remaining
+[101/130] ANALYZING .tldr/status
+[95/130] DONE crates/attractor-agent/Cargo.toml 73.5s 14261/1006 tok unknown ~19m 57s remaining
+[102/130] ANALYZING docs/accept-execute-c4-dot.md
+[96/130] DONE crates/attractor-web/Cargo.toml 42.8s 15012/835 tok unknown ~20m 47s remaining
+[103/130] ANALYZING docs/accept-execute-c4.md
+[97/130] DONE .tldr/status 24.2s 14090/154 tok unknown ~18m 39s remaining
+[104/130] ANALYZING docs/accept-execute-flow.md
+[98/130] DONE docs/accept-execute-c4-dot.md 31.2s 16459/1212 tok unknown ~19m 4s remaining
+[105/130] ANALYZING docs/cli-reference.md
+[99/130] DONE docs/plans/2026-04-09-feat-reckoner-software-factory-plan.md 49.8s 20318/2754 tok unknown ~20m 8s remaining
+[106/130] ANALYZING docs/dot-dialect.md
+[100/130] DONE .tldr/languages.json 54.2s 14112/443 tok unknown ~21m 28s remaining
+[107/130] ANALYZING docs/emergence-analysis.md
+[101/130] DONE .vscode/settings.json 56.4s 14102/363 tok unknown ~20m 25s remaining
+[108/130] ANALYZING docs/guide.md
+[102/130] DONE docs/plans/2026-04-14-fix-codebase-audit-outstanding-issues.md 60.8s 16655/1035 tok unknown ~21m 29s remaining
+[109/130] ANALYZING docs/task-verification.md
+[103/130] DONE docs/dot-dialect.md 16.6s 16857/1245 tok unknown ~20m 38s remaining
+[110/130] ANALYZING docs/web-interface-plan.md
+[104/130] DONE docs/accept-execute-c4.md 53.1s 15865/806 tok unknown ~20m 3s remaining
+[111/130] ANALYZING pipelines/attractor-e0n.dot
+[105/130] DONE docs/emergence-analysis.md 29.7s 16651/1074 tok unknown ~17m 27s remaining
+[112/130] ANALYZING pipelines/attractor-kbu.dot
+[106/130] DONE docs/cli-reference.md 44.7s 17573/993 tok unknown ~16m 50s remaining
+[113/130] ANALYZING pipelines/attractor-qsb.dot
+[107/130] DONE pipelines/attractor-e0n.dot 19.2s 16038/665 tok unknown ~15m 56s remaining
+[114/130] ANALYZING pipelines/attractor-s6a.dot
+[108/130] DONE docs/task-verification.md 35.4s 15817/1100 tok unknown ~15m 24s remaining
+[115/130] ANALYZING pipelines/build-beads-integration.dot
+[109/130] DONE pipelines/attractor-kbu.dot 22.4s 15184/612 tok unknown ~13m 44s remaining
+[116/130] ANALYZING pipelines/phase-1-spec.dot
+[110/130] DONE docs/accept-execute-flow.md 75.1s 16117/820 tok unknown ~13m 47s remaining
+[117/130] ANALYZING pipelines/phase-1-spec.dot.bak
+[111/130] DONE pipelines/attractor-qsb.dot 24.5s 15295/849 tok unknown ~12m 5s remaining
+[118/130] ANALYZING templates/beads.md
+[112/130] DONE docs/guide.md 61.7s 21423/2761 tok unknown ~11m 28s remaining
+[119/130] ANALYZING templates/epic-runner.dot
+[113/130] DONE templates/epic-runner.dot 13.8s 15146/1075 tok unknown ~10m 45s remaining
+[120/130] ANALYZING templates/pas.md
+[114/130] DONE templates/beads.md 22.5s 13928/244 tok unknown ~9m 18s remaining
+[121/130] ANALYZING templates/plan-to-execute.dot
+[115/130] DONE pipelines/phase-1-spec.dot.bak 28.9s 14431/590 tok unknown ~8m 42s remaining
+[122/130] ANALYZING templates/prd-template.md
+[116/130] DONE pipelines/attractor-s6a.dot 52.7s 15194/1102 tok unknown ~8m 19s remaining
+[123/130] ANALYZING templates/spec-template.md
+[117/130] DONE templates/pas.md 18.9s 15399/787 tok unknown ~7m 43s remaining
+[124/130] ANALYZING .envrc.example
+[118/130] DONE templates/prd-template.md 16.0s 14957/439 tok unknown ~6m 44s remaining
+[125/130] ANALYZING .tldrignore
+[119/130] DONE docs/web-interface-plan.md 103.6s 15755/1326 tok unknown ~7m 40s remaining
+[126/130] ANALYZING Cargo.toml
+[120/130] DONE templates/plan-to-execute.dot 32.3s 15363/851 tok unknown ~6m 15s remaining
+[127/130] ANALYZING LICENSE-APACHE
+[121/130] DONE templates/spec-template.md 30.7s 33066/905 tok unknown ~5m 43s remaining
+[128/130] ANALYZING LICENSE-MIT
+[122/130] DONE pipelines/phase-1-spec.dot 73.4s 21687/1252 tok unknown ~5m 14s remaining
+[129/130] ANALYZING README.md
+[123/130] DONE pipelines/build-beads-integration.dot 88.9s 15921/1379 tok unknown ~5m 28s remaining
+[130/130] ANALYZING install.sh
+[124/130] DONE .tldrignore 38.2s 14377/1170 tok unknown ~4m 50s remaining
+[125/130] DONE install.sh 15.7s 14505/715 tok unknown ~3m 55s remaining
+[126/130] DONE LICENSE-MIT 29.3s 14323/346 tok unknown ~2m 59s remaining
+[127/130] DONE .envrc.example 54.4s 14150/413 tok unknown ~2m 25s remaining
+[128/130] DONE Cargo.toml 41.8s 14377/1003 tok unknown ~1m 42s remaining
+[129/130] DONE README.md 27.9s 16299/1175 tok unknown ~43s remaining
+[130/130] DONE LICENSE-APACHE 54.9s 16284/370 tok unknown
+[dir 1/32] ANALYZING crates/attractor-pipeline/src/handlers/AGENTS.md
+[dir 2/32] ANALYZING crates/attractor-cli/src/commands/AGENTS.md
+[dir 3/32] ANALYZING crates/attractor-tools/src/builtin/AGENTS.md
+[dir 4/32] ANALYZING crates/attractor-web/public/js/AGENTS.md
+[dir 5/32] ANALYZING crates/attractor-web/src/components/AGENTS.md
+[dir 6/32] ANALYZING crates/attractor-web/src/server/AGENTS.md
+[dir 1/32] DONE crates/attractor-tools/src/builtin/AGENTS.md 23.0s 16946/399 tok unknown
+[dir 2/32] DONE crates/attractor-web/public/js/AGENTS.md 38.5s 15216/567 tok unknown ~15m 24s remaining
+[dir 3/32] DONE crates/attractor-web/src/server/AGENTS.md 57.6s 18740/1007 tok unknown ~19m 12s remaining
+[dir 4/32] DONE crates/attractor-pipeline/src/handlers/AGENTS.md 80.5s 18409/1452 tok unknown ~23m 18s remaining
+[dir 5/32] DONE crates/attractor-web/src/components/AGENTS.md 93.3s 17909/1182 tok unknown ~26m 22s remaining
+[dir 6/32] DONE crates/attractor-cli/src/commands/AGENTS.md 101.8s 19897/1449 tok unknown ~28m 31s remaining
+[dir 7/32] ANALYZING crates/attractor-agent/src/AGENTS.md
+[dir 8/32] ANALYZING crates/attractor-cli/src/AGENTS.md
+[dir 9/32] ANALYZING crates/attractor-pipeline/src/AGENTS.md
+[dir 10/32] ANALYZING crates/attractor-pipeline/tests/AGENTS.md
+[dir 11/32] ANALYZING crates/attractor-llm/src/AGENTS.md
+[dir 12/32] ANALYZING crates/attractor-dot/src/AGENTS.md
+[dir 13/32] ANALYZING crates/attractor-types/src/AGENTS.md
+[dir 7/32] DONE crates/attractor-pipeline/tests/AGENTS.md 24.8s 15696/694 tok unknown ~24m 59s remaining
+[dir 14/32] ANALYZING crates/attractor-tools/src/AGENTS.md
+[dir 8/32] DONE crates/attractor-types/src/AGENTS.md 27.4s 15427/836 tok unknown ~22m 21s remaining
+[dir 15/32] ANALYZING crates/attractor-web/src/AGENTS.md
+[dir 9/32] DONE crates/attractor-cli/src/AGENTS.md 31.9s 16636/1298 tok unknown ~20m 24s remaining
+[dir 16/32] ANALYZING crates/attractor-web/style/AGENTS.md
+[dir 10/32] DONE crates/attractor-agent/src/AGENTS.md 33.8s 17485/1246 tok unknown ~18m 48s remaining
+[dir 11/32] DONE crates/attractor-pipeline/src/AGENTS.md 37.7s 23363/1701 tok unknown ~18m 27s remaining
+[dir 12/32] DONE crates/attractor-web/src/AGENTS.md 18.4s 17916/882 tok unknown ~16m 54s remaining
+[dir 13/32] DONE crates/attractor-web/style/AGENTS.md 21.1s 16118/542 tok unknown ~14m 54s remaining
+[dir 14/32] DONE crates/attractor-dot/src/AGENTS.md 68.3s 16511/1118 tok unknown ~13m 45s remaining
+[dir 15/32] DONE crates/attractor-llm/src/AGENTS.md 81.0s 18345/1462 tok unknown ~12m 38s remaining
+[dir 16/32] DONE crates/attractor-tools/src/AGENTS.md 68.5s 17753/1062 tok unknown ~11m 1s remaining
+[dir 17/32] ANALYZING crates/attractor-agent/AGENTS.md
+[dir 18/32] ANALYZING crates/attractor-cli/AGENTS.md
+[dir 19/32] ANALYZING crates/attractor-pipeline/AGENTS.md
+[dir 20/32] ANALYZING crates/attractor-llm/AGENTS.md
+[dir 21/32] ANALYZING crates/attractor-dot/AGENTS.md
+[dir 22/32] ANALYZING crates/attractor-tools/AGENTS.md
+[dir 23/32] ANALYZING crates/attractor-types/AGENTS.md
+[dir 17/32] DONE crates/attractor-tools/AGENTS.md 22.0s 15818/985 tok unknown ~10m 15s remaining
+[dir 24/32] ANALYZING crates/attractor-web/AGENTS.md
+[dir 18/32] DONE crates/attractor-dot/AGENTS.md 26.2s 15589/897 tok unknown ~9m 32s remaining
+[dir 25/32] ANALYZING docs/examples/AGENTS.md
+[dir 19/32] DONE crates/attractor-agent/AGENTS.md 47.8s 15769/1916 tok unknown ~9m 12s remaining
+[dir 26/32] ANALYZING docs/plans/AGENTS.md
+[dir 20/32] DONE crates/attractor-llm/AGENTS.md 51.2s 16185/1558 tok unknown ~8m 51s remaining
+[dir 21/32] DONE docs/examples/AGENTS.md 33.1s 15397/509 tok unknown ~8m 1s remaining
+[dir 22/32] DONE crates/attractor-web/AGENTS.md 42.6s 16747/1534 tok unknown ~7m 42s remaining
+[dir 23/32] DONE crates/attractor-cli/AGENTS.md 67.0s 15952/1282 tok unknown ~7m 37s remaining
+[dir 24/32] DONE crates/attractor-types/AGENTS.md 73.8s 15437/969 tok unknown ~6m 51s remaining
+[dir 25/32] DONE docs/plans/AGENTS.md 40.3s 17773/955 tok unknown ~5m 31s remaining
+[dir 26/32] DONE crates/attractor-pipeline/AGENTS.md 102.8s 16725/2123 tok unknown ~5m 4s remaining
+[dir 27/32] ANALYZING .vscode/AGENTS.md
+[dir 28/32] ANALYZING .tldr/AGENTS.md
+[dir 29/32] ANALYZING docs/AGENTS.md
+[dir 30/32] ANALYZING pipelines/AGENTS.md
+[dir 31/32] ANALYZING templates/AGENTS.md
+[dir 27/32] DONE .tldr/AGENTS.md 18.5s 14859/239 tok unknown ~4m 12s remaining
+[dir 28/32] DONE .vscode/AGENTS.md 38.5s 14778/250 tok unknown ~3m 26s remaining
+[dir 29/32] DONE docs/AGENTS.md 40.5s 23475/1478 tok unknown ~2m 32s remaining
+[dir 30/32] DONE pipelines/AGENTS.md 40.5s 19335/1976 tok unknown ~1m 40s remaining
+[dir 31/32] DONE templates/AGENTS.md 84.1s 17770/1212 tok unknown ~55s remaining
+[dir 32/32] ANALYZING ./AGENTS.md
+[dir 32/32] DONE ./AGENTS.md 31.8s 20759/1484 tok unknown
+
+=== Run Summary ===
+  ARE version:     1.2.17
+  Files processed: 130
+  Dirs processed:  32
+  Total calls:     162
+  Tokens:          1951460 in / 149381 out
+  Cached:          633424 read in / 141184 created in
+  Total:           2726068 in / 149381 out
+  Files read:      130 (130 unique)
+  Total time:      1140.4s
+  Errors:          0
