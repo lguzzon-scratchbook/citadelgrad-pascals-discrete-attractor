@@ -205,6 +205,10 @@ export GEMINI_API_KEY=...
 | `attractor-pipeline` | Pipeline graph, engine, handlers, validation, stylesheets |
 | `attractor-cli` | CLI binary — `pas` (`run`, `validate`, `info`, `plan`, `decompose`, `scaffold`, `generate`) |
 
+## Reference
+
+Built with reference to [strongdm/attractor](https://github.com/strongdm/attractor).
+
 ## License
 
 Licensed under either of
