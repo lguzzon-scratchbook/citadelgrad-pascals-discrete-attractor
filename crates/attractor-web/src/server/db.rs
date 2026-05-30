@@ -23,12 +23,12 @@ pub struct CachedDoc {
 pub async fn init_db() -> Result<SqlitePool, sqlx::Error> {
     // Determine database path: ~/.pas/web.db
     let home_dir = std::env::var("HOME")
-        .expect("HOME environment variable not set");
+        .map_err(|e| sqlx::Error::Configuration(format!("HOME not set: {e}").into()))?;
     let pas_dir = PathBuf::from(home_dir).join(".pas");
 
     // Create directory if it doesn't exist
     std::fs::create_dir_all(&pas_dir)
-        .expect("Failed to create ~/.pas directory");
+        .map_err(sqlx::Error::Io)?;
 
     let db_path = pas_dir.join("web.db");
     let db_url = format!("sqlite:{}?mode=rwc", db_path.display());

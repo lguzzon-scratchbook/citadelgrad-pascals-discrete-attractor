@@ -2,6 +2,12 @@
 
 All notable changes to PAS are documented here.
 
+## [0.7.1] — 2026-05-29
+
+### Fixed
+
+- Replace `.expect()` panics in `init_db()` with proper error propagation via `sqlx::Error::Configuration` and `sqlx::Error::Io`.
+
 ## [0.7.0] — 2026-05-29
 
 ### Added
