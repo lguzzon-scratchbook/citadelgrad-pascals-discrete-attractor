@@ -215,7 +215,7 @@ fn tool_result_messages_merge_into_user() {
             name: None,
             tool_call_id: None,
         },
-        Message::tool_result("tc_1", "result data", false),
+        Message::tool_result("tc_1", "search", "result data", false),
     ];
 
     let converted = convert_messages(&messages);
