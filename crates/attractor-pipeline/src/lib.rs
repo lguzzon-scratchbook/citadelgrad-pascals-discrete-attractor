@@ -14,6 +14,7 @@ pub mod graph;
 pub mod handler;
 pub mod handlers;
 pub mod interviewer;
+pub mod preflight;
 pub mod retry;
 pub mod stylesheet;
 pub mod transforms;
@@ -40,4 +41,5 @@ pub use interviewer::{
 pub use retry::{execute_with_retry, BackoffPolicy};
 pub use stylesheet::{apply_stylesheet, parse_stylesheet, Declaration, Rule, Selector, Stylesheet};
 pub use transforms::{apply_transforms, expand_variables};
+pub use preflight::{run as preflight_run, PreflightFinding, Severity as PreflightSeverity};
 pub use validation::{validate, validate_or_raise, Diagnostic, LintRule, Severity};

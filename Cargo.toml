@@ -7,6 +7,7 @@ members = [
     "crates/attractor-tools",
     "crates/attractor-agent",
     "crates/attractor-pipeline",
+    "crates/attractor-quality",
     "crates/attractor-cli",
     "crates/attractor-web",
 ]

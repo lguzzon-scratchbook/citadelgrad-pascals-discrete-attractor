@@ -1,0 +1,12 @@
+[package]
+name = "attractor-quality"
+version.workspace = true
+edition = "2021"
+license.workspace = true
+description = "Quality manifest resolution and handler support for attractor pipelines"
+
+[dependencies]
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

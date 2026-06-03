@@ -207,6 +207,7 @@ dependencies = [
  "attractor-agent",
  "attractor-dot",
  "attractor-llm",
+ "attractor-quality",
  "attractor-tools",
  "attractor-types",
  "chrono",
@@ -219,6 +220,14 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "attractor-quality"
+version = "0.7.1"
+dependencies = [
+ "tempfile",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
