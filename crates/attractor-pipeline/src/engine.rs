@@ -125,33 +125,17 @@ impl PipelineExecutor {
         let mut completed_nodes: Vec<String> = Vec::new();
         let mut node_outcomes: HashMap<String, Outcome> = HashMap::new();
 
+        // Quality loop state: per-(node_id::upstream_id) entry counters
+        let mut quality_loop_counters: HashMap<String, u32> = HashMap::new();
+        let mut quality_last_footprint: HashMap<String, String> = HashMap::new();
+        // Tracks the node we came from (upstream) for loop-key construction
+        let mut prev_node_id: Option<String> = None;
+
         // Phase 4: Execute — check for checkpoint to resume from
         let start = graph.start_node().ok_or_else(|| {
             AttractorError::ValidationError("No start node found".into())
         })?;
         let mut current_node = start;
-
-        if let Some(logs) = logs_root {
-            if let Some(cp) = load_checkpoint(logs).await? {
-                tracing::info!(
-                    node = %cp.current_node_id,
-                    completed = cp.completed_nodes.len(),
-                    "Resuming from checkpoint"
-                );
-                // Restore context
-                context.apply_updates(cp.context_snapshot).await;
-                // Restore completed state
-                completed_nodes = cp.completed_nodes;
-                node_outcomes = cp.node_outcomes;
-                // Jump to the node that was about to execute
-                current_node = graph.node(&cp.current_node_id).ok_or_else(|| {
-                    AttractorError::Other(format!(
-                        "Checkpoint node '{}' not found in graph — was the .dot file changed?",
-                        cp.current_node_id
-                    ))
-                })?;
-            }
-        }
 
         // Safety limits from context (set by CLI flags)
         let max_budget: f64 = context
@@ -166,6 +150,33 @@ impl PipelineExecutor {
             .unwrap_or(200);
         let mut total_cost: f64 = 0.0;
         let mut step_count: u64 = 0;
+
+        if let Some(logs) = logs_root {
+            if let Some(cp) = load_checkpoint(logs).await? {
+                tracing::info!(
+                    node = %cp.current_node_id,
+                    completed = cp.completed_nodes.len(),
+                    "Resuming from checkpoint"
+                );
+                // Restore context
+                context.apply_updates(cp.context_snapshot).await;
+                // Restore completed state
+                completed_nodes = cp.completed_nodes;
+                node_outcomes = cp.node_outcomes;
+                // Restore counters from checkpoint
+                step_count = cp.step_count;
+                total_cost = cp.total_cost;
+                quality_loop_counters = cp.quality_loop_counters;
+                quality_last_footprint = cp.quality_last_footprint;
+                // Jump to the node that was about to execute
+                current_node = graph.node(&cp.current_node_id).ok_or_else(|| {
+                    AttractorError::Other(format!(
+                        "Checkpoint node '{}' not found in graph — was the .dot file changed?",
+                        cp.current_node_id
+                    ))
+                })?;
+            }
+        }
 
         loop {
             // Check safety limits
@@ -224,7 +235,84 @@ impl PipelineExecutor {
                     message: format!("No handler registered for type '{}'", handler_type),
                 }
             })?;
+
+            // Quality loop control: track entries and enforce max_fix_iterations
+            let is_quality = handler_type == "quality";
+            if is_quality {
+                let upstream = prev_node_id.as_deref().unwrap_or("__start__");
+                let loop_key = format!("{}::{}", current_node.id, upstream);
+                let counter = quality_loop_counters.entry(loop_key).or_insert(0);
+                *counter += 1;
+                let iteration = *counter;
+
+                // Resolve max_fix_iterations: node attr → context → default 3
+                let max_iters = match current_node.raw_attrs.get("max_fix_iterations") {
+                    Some(attractor_dot::AttributeValue::Integer(n)) => *n as u32,
+                    _ => context
+                        .get("quality_max_fix_iterations")
+                        .await
+                        .and_then(|v| v.as_u64())
+                        .map(|n| n as u32)
+                        .unwrap_or(3),
+                };
+
+                if iteration > max_iters {
+                    return Err(AttractorError::Other(format!(
+                        "Quality node '{}' exceeded max_fix_iterations ({max_iters}) — aborting pipeline",
+                        current_node.id
+                    )));
+                }
+
+                if iteration >= 2 {
+                    // 1-second cooldown between loop iterations
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+                    // Inject structured retry-warning with sentinel tags
+                    let last_fp = quality_last_footprint
+                        .get(&current_node.id)
+                        .cloned()
+                        .unwrap_or_default();
+                    let warning = format!(
+                        "<retry-warning iteration=\"{iteration}\" node=\"{}\" footprint=\"{last_fp}\">\n\
+                         Quality stage failed on the previous attempt. Review the failure output \
+                         and fix the root cause before proceeding.\n\
+                         </retry-warning>",
+                        current_node.id
+                    );
+                    context
+                        .set(
+                            format!("__quality_retry_warning::{}", current_node.id),
+                            serde_json::Value::String(warning),
+                        )
+                        .await;
+                    tracing::warn!(
+                        node = %current_node.id,
+                        iteration = iteration,
+                        max = max_iters,
+                        footprint = %last_fp,
+                        "Quality retry loop"
+                    );
+                }
+            }
+
             let outcome = handler.execute(current_node, &context, graph).await?;
+
+            // Extract failure_footprint for the quality loop tracker
+            if is_quality && outcome.status == StageStatus::Fail {
+                if let Some(results) = outcome
+                    .context_updates
+                    .get(&format!("{}.results", current_node.id))
+                    .and_then(|v| v.as_array())
+                {
+                    for r in results {
+                        if let Some(fp) = r.get("failure_footprint").and_then(|v| v.as_str()) {
+                            quality_last_footprint
+                                .insert(current_node.id.clone(), fp.to_string());
+                            break;
+                        }
+                    }
+                }
+            }
 
             // Record
             completed_nodes.push(current_node.id.clone());
@@ -294,14 +382,19 @@ impl PipelineExecutor {
 
                     // Save checkpoint: the *next* node to execute
                     if let Some(logs) = logs_root {
-                        let cp = PipelineCheckpoint::new(
+                        let cp = PipelineCheckpoint::with_quality_counters(
                             current_node.id.clone(),
                             completed_nodes.clone(),
                             node_outcomes.clone(),
                             context.snapshot().await,
+                            step_count,
+                            total_cost,
+                            quality_loop_counters.clone(),
+                            quality_last_footprint.clone(),
                         );
                         save_checkpoint(&cp, logs).await?;
                     }
+                    prev_node_id = Some(completed_nodes.last().cloned().unwrap_or_default());
                 }
                 None => {
                     // No outgoing edge and not an exit node

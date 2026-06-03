@@ -33,6 +33,17 @@ pub struct PipelineCheckpoint {
     /// Total cost accrued so far in USD (for enforcing max_budget_usd across resume).
     #[serde(default)]
     pub total_cost: f64,
+    /// Schema version for forward-compatibility. Defaults to 0 on old checkpoints.
+    #[serde(default)]
+    pub schema_version: u32,
+    /// Per-(quality-node-ID, upstream-node-ID) re-entry counters.
+    /// Key format: "<node_id>::<upstream_id>". Persisted so loop budgets
+    /// survive checkpoint resume.
+    #[serde(default)]
+    pub quality_loop_counters: HashMap<String, u32>,
+    /// Last failure_footprint seen for each quality node, keyed by node ID.
+    #[serde(default)]
+    pub quality_last_footprint: HashMap<String, String>,
 }
 
 impl PipelineCheckpoint {
@@ -52,6 +63,9 @@ impl PipelineCheckpoint {
             session_id: None,
             step_count: 0,
             total_cost: 0.0,
+            schema_version: 1,
+            quality_loop_counters: HashMap::new(),
+            quality_last_footprint: HashMap::new(),
         }
     }
 
@@ -73,6 +87,9 @@ impl PipelineCheckpoint {
             session_id: None,
             step_count,
             total_cost,
+            schema_version: 1,
+            quality_loop_counters: HashMap::new(),
+            quality_last_footprint: HashMap::new(),
         }
     }
 
@@ -95,6 +112,36 @@ impl PipelineCheckpoint {
             session_id: Some(session_id),
             step_count,
             total_cost,
+            schema_version: 1,
+            quality_loop_counters: HashMap::new(),
+            quality_last_footprint: HashMap::new(),
+        }
+    }
+
+    /// Create a checkpoint preserving quality loop counters (used by the engine
+    /// when saving mid-loop state).
+    pub fn with_quality_counters(
+        current_node_id: String,
+        completed_nodes: Vec<String>,
+        node_outcomes: HashMap<String, attractor_types::Outcome>,
+        context_snapshot: HashMap<String, serde_json::Value>,
+        step_count: u64,
+        total_cost: f64,
+        quality_loop_counters: HashMap<String, u32>,
+        quality_last_footprint: HashMap<String, String>,
+    ) -> Self {
+        Self {
+            current_node_id,
+            completed_nodes,
+            node_outcomes,
+            context_snapshot,
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            session_id: None,
+            step_count,
+            total_cost,
+            schema_version: 1,
+            quality_loop_counters,
+            quality_last_footprint,
         }
     }
 }
