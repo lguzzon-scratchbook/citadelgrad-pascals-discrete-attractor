@@ -192,4 +192,164 @@ mod tests {
             "default_registry() should include the 'quality' handler"
         );
     }
+
+    // -----------------------------------------------------------------------
+    // Test 8: failure_footprint is present in results on stage failure
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn quality_handler_failure_footprint_set_on_fail() {
+        let handler = QualityHandler;
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "quality_checks".into(),
+            AttributeValue::String("sh -c 'echo stderr_output >&2; exit 1'".into()),
+        );
+        let node = make_node("verify", "box", None, attrs);
+        let ctx = Context::default();
+        let graph = make_minimal_graph();
+
+        let outcome = handler.execute(&node, &ctx, &graph).await.unwrap();
+        assert_eq!(outcome.status, StageStatus::Fail);
+
+        let results = outcome
+            .context_updates
+            .get("verify.results")
+            .and_then(|v| v.as_array())
+            .expect("verify.results should be a JSON array");
+
+        let footprint = results[0]
+            .get("failure_footprint")
+            .expect("failure_footprint should be present");
+        assert!(
+            !footprint.is_null(),
+            "failure_footprint should be non-null on failure"
+        );
+        let fp_str = footprint.as_str().unwrap_or("");
+        assert_eq!(fp_str.len(), 16, "failure_footprint should be 16 hex chars");
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 9: truncate_head_tail keeps head + tail, omits middle
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn truncate_head_tail_keeps_head_and_tail() {
+        use crate::handlers::quality_handler::truncate_head_tail;
+
+        let lines: Vec<String> = (1..=200).map(|i| format!("line {i}")).collect();
+        let text = lines.join("\n");
+
+        let result = truncate_head_tail(&text, 5, 5);
+        assert!(result.contains("line 1"), "should contain head");
+        assert!(result.contains("line 5"), "should contain last head line");
+        assert!(result.contains("line 200"), "should contain tail");
+        assert!(result.contains("omitted"), "should mention omitted lines");
+        assert!(
+            !result.contains("line 100"),
+            "middle lines should be omitted"
+        );
+    }
+
+    #[test]
+    fn truncate_head_tail_short_text_unchanged() {
+        use crate::handlers::quality_handler::truncate_head_tail;
+
+        let text = "line 1\nline 2\nline 3";
+        let result = truncate_head_tail(text, 50, 50);
+        assert_eq!(result, text.trim_end());
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 10: manifest-driven stages run from [quality.stages]
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn quality_handler_manifest_stages_run_in_order() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        let tmp = TempDir::new().unwrap();
+        let manifest = r#"
+[project]
+name = "test-project"
+
+[quality]
+stages = ["check-a", "check-b"]
+
+[quality.hooks.check-a]
+cmd = "true"
+
+[quality.hooks.check-b]
+cmd = "true"
+"#;
+        let toml_path = tmp.path().join("pas.toml");
+        std::fs::File::create(&toml_path)
+            .unwrap()
+            .write_all(manifest.as_bytes())
+            .unwrap();
+
+        // Also write a sentinel .git dir so resolve() stops here
+        std::fs::create_dir_all(tmp.path().join(".git")).unwrap();
+
+        let handler = QualityHandler;
+        // No quality_checks attr — must use manifest
+        let node = make_node("verify", "box", None, HashMap::new());
+        let ctx = Context::default();
+        ctx.set(
+            "n",
+            serde_json::Value::String(tmp.path().to_string_lossy().to_string()),
+        )
+        .await;
+        let graph = make_minimal_graph();
+
+        let outcome = handler.execute(&node, &ctx, &graph).await.unwrap();
+        assert_eq!(outcome.status, StageStatus::Success);
+
+        let results = outcome
+            .context_updates
+            .get("verify.results")
+            .and_then(|v| v.as_array())
+            .expect("verify.results should be an array");
+        assert_eq!(results.len(), 2, "both manifest stages should have run");
+        assert_eq!(results[0].get("stage").and_then(|v| v.as_str()), Some("check-a"));
+        assert_eq!(results[1].get("stage").and_then(|v| v.as_str()), Some("check-b"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 11 (integration): 2-node pass+fail outcomes
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn quality_handler_two_node_pipeline_pass_then_fail() {
+        let handler = QualityHandler;
+        let graph = make_minimal_graph();
+
+        // Node 1: passes
+        let mut attrs1 = HashMap::new();
+        attrs1.insert(
+            "quality_checks".into(),
+            AttributeValue::String("true".into()),
+        );
+        let node1 = make_node("node1", "box", None, attrs1);
+        let ctx1 = Context::default();
+        let out1 = handler.execute(&node1, &ctx1, &graph).await.unwrap();
+        assert_eq!(out1.status, StageStatus::Success);
+
+        // Node 2: fails
+        let mut attrs2 = HashMap::new();
+        attrs2.insert(
+            "quality_checks".into(),
+            AttributeValue::String("false".into()),
+        );
+        let node2 = make_node("node2", "box", None, attrs2);
+        let ctx2 = Context::default();
+        let out2 = handler.execute(&node2, &ctx2, &graph).await.unwrap();
+        assert_eq!(out2.status, StageStatus::Fail);
+        assert!(out2.failure_reason.is_some());
+        assert_eq!(
+            out2.context_updates.get("node2.completed"),
+            Some(&serde_json::Value::Bool(false))
+        );
+    }
 }

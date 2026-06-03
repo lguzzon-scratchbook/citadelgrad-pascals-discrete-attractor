@@ -1,17 +1,45 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+use std::path::PathBuf;
+use std::time::Instant;
 
 use async_trait::async_trait;
 use attractor_dot::AttributeValue;
+use attractor_quality::telemetry::{self, StageEvent};
 use attractor_types::{AttractorError, Context, Outcome, Result, StageStatus};
 
 use crate::graph::{PipelineGraph, PipelineNode};
 use crate::handler::NodeHandler;
 
-// ---------------------------------------------------------------------------
-// QualityHandler — runs a pipe-separated list of shell quality checks
-// ---------------------------------------------------------------------------
+// Environment variables passed through to quality stage processes.
+const ENV_ALLOWLIST: &[&str] = &[
+    "PATH",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "USER",
+    "LOGNAME",
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "TERM",
+    "SHELL",
+    "CARGO_HOME",
+    "RUSTUP_HOME",
+];
+
+// Lines kept from head and tail of each stage's output for truncation.
+const HEAD_LINES: usize = 50;
+const TAIL_LINES: usize = 50;
 
 pub struct QualityHandler;
+
+struct StageSpec {
+    name: String,
+    argv: Vec<String>,
+    timeout_secs: Option<u64>,
+    allow_failure: bool,
+}
 
 #[async_trait]
 impl NodeHandler for QualityHandler {
@@ -29,14 +57,7 @@ impl NodeHandler for QualityHandler {
 
         // Check 1: enabled=false in node attrs → skip with success
         if let Some(AttributeValue::Boolean(false)) = node.raw_attrs.get("enabled") {
-            return Ok(Outcome {
-                status: StageStatus::Success,
-                preferred_label: None,
-                suggested_next_ids: vec![],
-                context_updates: HashMap::new(),
-                notes: "Quality checks disabled via node attribute".into(),
-                failure_reason: None,
-            });
+            return Ok(skip_outcome("Quality checks disabled via node attribute"));
         }
 
         // Check 2: quality_disabled=true in runtime context → skip with success
@@ -46,33 +67,49 @@ impl NodeHandler for QualityHandler {
             .and_then(|v| v.as_bool())
             .unwrap_or(false)
         {
-            return Ok(Outcome {
-                status: StageStatus::Success,
-                preferred_label: None,
-                suggested_next_ids: vec![],
-                context_updates: HashMap::new(),
-                notes: "Quality checks disabled via runtime flag".into(),
-                failure_reason: None,
-            });
+            return Ok(skip_outcome("Quality checks disabled via runtime flag"));
         }
 
-        // Get quality_checks attribute (required)
-        let checks_str = match node.raw_attrs.get("quality_checks") {
-            Some(AttributeValue::String(s)) => s.clone(),
-            _ => {
-                return Err(AttractorError::HandlerError {
-                    handler: "quality".into(),
-                    node: node_id.clone(),
-                    message: "missing required attribute 'quality_checks'".into(),
-                })
+        // Determine workdir from context key "n"
+        let workdir: PathBuf = context
+            .get("n")
+            .await
+            .and_then(|v| v.as_str().map(PathBuf::from))
+            .unwrap_or_else(|| {
+                std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+            });
+
+        // Primary: manifest-driven stages; fallback: quality_checks attribute
+        let stages: Vec<StageSpec> = match attractor_quality::resolve(&workdir) {
+            Ok(resolved) => {
+                if let Some(quality) = &resolved.manifest.quality {
+                    if !quality.stages.is_empty() {
+                        quality
+                            .stages
+                            .iter()
+                            .map(|s| {
+                                let hook = quality.hooks.get(s);
+                                StageSpec {
+                                    name: s.clone(),
+                                    argv: resolve_argv(s, hook),
+                                    timeout_secs: hook.and_then(|h| h.timeout_secs),
+                                    allow_failure: hook
+                                        .and_then(|h| h.allow_failure)
+                                        .unwrap_or(false),
+                                }
+                            })
+                            .collect()
+                    } else {
+                        stages_from_attr(node, node_id)?
+                    }
+                } else {
+                    stages_from_attr(node, node_id)?
+                }
             }
+            Err(_) => stages_from_attr(node, node_id)?,
         };
 
-        // Split on '|' to get individual commands
-        let commands: Vec<&str> = checks_str.split('|').collect();
-
-        // Apply timeout from node config, defaulting to 10 minutes
-        let timeout_dur = node
+        let default_timeout = node
             .timeout
             .unwrap_or(std::time::Duration::from_secs(600));
 
@@ -80,53 +117,118 @@ impl NodeHandler for QualityHandler {
         let mut all_passed = true;
         let mut failure_summaries: Vec<String> = Vec::new();
 
-        for cmd in &commands {
-            let cmd = cmd.trim();
+        for stage in &stages {
+            let stage_timeout = stage
+                .timeout_secs
+                .map(std::time::Duration::from_secs)
+                .unwrap_or(default_timeout);
 
-            let output =
-                match tokio::time::timeout(timeout_dur, tokio::process::Command::new("sh")
-                    .arg("-c")
-                    .arg(cmd)
-                    .output())
-                .await
-            {
-                Ok(Ok(o)) => o,
-                Ok(Err(e)) => {
+            let start = Instant::now();
+
+            let (program, args) = match stage.argv.split_first() {
+                Some(pair) => pair,
+                None => {
                     return Err(AttractorError::HandlerError {
                         handler: "quality".into(),
                         node: node_id.clone(),
-                        message: format!("failed to spawn command '{cmd}': {e}"),
-                    })
-                }
-                Err(_) => {
-                    return Err(AttractorError::CommandTimeout {
-                        timeout_ms: timeout_dur.as_millis() as u64,
+                        message: format!("stage '{}' has empty argv", stage.name),
                     })
                 }
             };
 
-            let passed = output.status.success();
+            let mut cmd = tokio::process::Command::new(program);
+            cmd.args(args);
+            cmd.current_dir(&workdir);
+            cmd.env_clear();
+            cmd.kill_on_drop(true);
+            cmd.stdout(std::process::Stdio::piped());
+            cmd.stderr(std::process::Stdio::piped());
+
+            for key in ENV_ALLOWLIST {
+                if let Ok(val) = std::env::var(key) {
+                    cmd.env(key, val);
+                }
+            }
+
+            #[cfg(unix)]
+            cmd.process_group(0);
+
+            let mut child = cmd.spawn().map_err(|e| AttractorError::HandlerError {
+                handler: "quality".into(),
+                node: node_id.clone(),
+                message: format!("failed to spawn stage '{}': {e}", stage.name),
+            })?;
+
+            // Capture PID before wait_with_output() consumes child.
+            #[cfg(unix)]
+            let child_pid = child.id();
+
+            let output =
+                match tokio::time::timeout(stage_timeout, child.wait_with_output()).await {
+                    Ok(Ok(o)) => o,
+                    Ok(Err(e)) => {
+                        return Err(AttractorError::HandlerError {
+                            handler: "quality".into(),
+                            node: node_id.clone(),
+                            message: format!("stage '{}' I/O error: {e}", stage.name),
+                        })
+                    }
+                    Err(_) => {
+                        // Kill the process group, then let kill_on_drop clean up the child.
+                        #[cfg(unix)]
+                        if let Some(pid) = child_pid {
+                            unsafe { libc::killpg(pid as libc::pid_t, libc::SIGKILL) };
+                        }
+                        return Err(AttractorError::CommandTimeout {
+                            timeout_ms: stage_timeout.as_millis() as u64,
+                        });
+                    }
+                };
+
+            let duration_ms = start.elapsed().as_millis() as u64;
             let exit_code = output.status.code().unwrap_or(-1);
+            let stage_ok = output.status.success();
+            let passed = stage_ok || stage.allow_failure;
+
             let stderr_raw = String::from_utf8_lossy(&output.stderr);
-            let stderr = if stderr_raw.len() > 8192 {
-                stderr_raw[..8192].to_string()
+            let stderr_display = truncate_head_tail(&stderr_raw, HEAD_LINES, TAIL_LINES);
+
+            // failure_footprint = blake3(stage_name || first_2KB(stderr))[..16]
+            let failure_footprint = if !stage_ok {
+                let slice = &stderr_raw[..stderr_raw.len().min(2048)];
+                let input = format!("{}{}", stage.name, slice);
+                let hash = blake3::hash(input.as_bytes());
+                Some(hash.to_hex()[..16].to_string())
             } else {
-                stderr_raw.trim_end().to_string()
+                None
             };
+
+            telemetry::record(
+                node_id,
+                &StageEvent {
+                    stage: stage.name.clone(),
+                    passed,
+                    exit_code,
+                    failure_footprint: failure_footprint.clone(),
+                    duration_ms,
+                },
+            );
 
             results.push(serde_json::json!({
-                "cmd": cmd,
+                "stage": stage.name,
                 "exit_code": exit_code,
                 "passed": passed,
-                "stderr": stderr,
+                "stderr": stderr_display,
+                "failure_footprint": failure_footprint,
+                "duration_ms": duration_ms,
             }));
 
             if !passed {
                 all_passed = false;
-                if !stderr.is_empty() {
-                    failure_summaries.push(stderr.clone());
+                if !stderr_display.is_empty() {
+                    failure_summaries.push(stderr_display);
                 }
-                break; // fail-fast: stop on first failure
+                break; // fail-fast on first failure
             }
         }
 
@@ -152,7 +254,7 @@ impl NodeHandler for QualityHandler {
                 suggested_next_ids: vec![],
                 context_updates,
                 notes: String::new(),
-                failure_reason: Some("one or more quality checks failed".into()),
+                failure_reason: Some("one or more quality stages failed".into()),
             })
         } else {
             Ok(Outcome {
@@ -165,4 +267,91 @@ impl NodeHandler for QualityHandler {
             })
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+fn skip_outcome(notes: &str) -> Outcome {
+    Outcome {
+        status: StageStatus::Success,
+        preferred_label: None,
+        suggested_next_ids: vec![],
+        context_updates: HashMap::new(),
+        notes: notes.into(),
+        failure_reason: None,
+    }
+}
+
+/// Resolve argv for a manifest stage: prefer cmd_argv, then shlex-split cmd,
+/// then fall back to `sh -c <stage_name>`.
+fn resolve_argv(stage: &str, hook: Option<&attractor_quality::HookConfig>) -> Vec<String> {
+    if let Some(h) = hook {
+        if let Some(argv) = &h.cmd_argv {
+            if !argv.is_empty() {
+                return argv.clone();
+            }
+        }
+        if let Some(cmd) = &h.cmd {
+            if let Some(parts) = shlex::split(cmd) {
+                if !parts.is_empty() {
+                    return parts;
+                }
+            }
+            return vec!["sh".into(), "-c".into(), cmd.clone()];
+        }
+    }
+    // No hook config: treat stage name as a shell command
+    vec!["sh".into(), "-c".into(), stage.to_string()]
+}
+
+/// Build stages from the pipe-separated `quality_checks` node attribute (legacy fallback).
+fn stages_from_attr(node: &PipelineNode, node_id: &str) -> Result<Vec<StageSpec>> {
+    let checks_str = match node.raw_attrs.get("quality_checks") {
+        Some(AttributeValue::String(s)) => s.clone(),
+        _ => {
+            return Err(AttractorError::HandlerError {
+                handler: "quality".into(),
+                node: node_id.to_string(),
+                message: "missing required attribute 'quality_checks'".into(),
+            })
+        }
+    };
+
+    Ok(checks_str
+        .split('|')
+        .map(|cmd| {
+            let cmd = cmd.trim().to_string();
+            StageSpec {
+                name: cmd.clone(),
+                argv: vec!["sh".into(), "-c".into(), cmd],
+                timeout_secs: None,
+                allow_failure: false,
+            }
+        })
+        .collect())
+}
+
+/// Keep at most `head` lines from the start and `tail` lines from the end.
+/// Returns the full text if it fits within head+tail lines.
+pub(crate) fn truncate_head_tail(text: &str, head: usize, tail: usize) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    let total = lines.len();
+    if total <= head + tail {
+        return text.trim_end().to_string();
+    }
+    let omitted = total - head - tail;
+    let mut buf = lines[..head].join("\n");
+    buf.push_str(&format!("\n... ({omitted} lines omitted) ...\n"));
+    // Ring buffer for the tail
+    let mut tail_buf: VecDeque<&str> = VecDeque::with_capacity(tail);
+    for line in &lines[head..] {
+        if tail_buf.len() == tail {
+            tail_buf.pop_front();
+        }
+        tail_buf.push_back(line);
+    }
+    buf.push_str(&tail_buf.make_contiguous().join("\n"));
+    buf
 }

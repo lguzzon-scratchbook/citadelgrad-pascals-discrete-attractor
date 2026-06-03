@@ -22,6 +22,8 @@ tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 libc = "0.2"
+blake3 = "1"
+shlex = "1"
 
 [dev-dependencies]
 tempfile = "3"

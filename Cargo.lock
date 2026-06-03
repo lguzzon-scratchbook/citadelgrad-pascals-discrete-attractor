@@ -226,11 +226,13 @@ dependencies = [
  "attractor-quality",
  "attractor-tools",
  "attractor-types",
+ "blake3",
  "chrono",
  "libc",
  "regex",
  "serde",
  "serde_json",
+ "shlex",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
@@ -250,6 +252,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "toml 1.1.2+spec-1.1.0",
+ "tracing",
 ]
 
 [[package]]
