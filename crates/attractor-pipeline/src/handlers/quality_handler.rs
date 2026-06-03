@@ -153,7 +153,7 @@ impl NodeHandler for QualityHandler {
             #[cfg(unix)]
             cmd.process_group(0);
 
-            let mut child = cmd.spawn().map_err(|e| AttractorError::HandlerError {
+            let child = cmd.spawn().map_err(|e| AttractorError::HandlerError {
                 handler: "quality".into(),
                 node: node_id.clone(),
                 message: format!("failed to spawn stage '{}': {e}", stage.name),

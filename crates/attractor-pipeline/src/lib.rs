@@ -33,7 +33,7 @@ pub use handler::{
 };
 pub use handlers::wait_human::WaitHumanHandler;
 pub use handlers::{
-    CodergenHandler, FanInHandler, ManagerLoopHandler, ParallelHandler, ToolHandler,
+    CodergenHandler, FanInHandler, ManagerLoopHandler, ParallelHandler, QualityHandler, ToolHandler,
 };
 pub use interviewer::{
     Answer, AutoApproveInterviewer, ConsoleInterviewer, Interviewer, Question, RecordingInterviewer,

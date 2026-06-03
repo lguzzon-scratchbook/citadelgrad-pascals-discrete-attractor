@@ -10,9 +10,8 @@ use async_trait::async_trait;
 
 use attractor_dot::parse;
 use attractor_pipeline::{
-    apply_stylesheet, parse_stylesheet, validate, ConditionalHandler,
-    ExitHandler, HandlerRegistry, NodeHandler, PipelineExecutor, PipelineGraph, PipelineNode,
-    StartHandler,
+    validate, ConditionalHandler, ExitHandler, HandlerRegistry, NodeHandler, PipelineExecutor,
+    PipelineGraph, PipelineNode, QualityHandler, StartHandler,
 };
 use attractor_types::{Context, Outcome, StageStatus};
 
@@ -373,6 +372,17 @@ async fn graph_goal_attribute_propagates_to_context() {
     );
 }
 
+/// Build an executor with QualityHandler registered (no real Claude CLI calls needed).
+fn executor_with_quality() -> PipelineExecutor {
+    let mut registry = HandlerRegistry::new();
+    registry.register(StartHandler);
+    registry.register(ExitHandler);
+    registry.register(ConditionalHandler);
+    registry.register(QualityHandler);
+    registry.register(MockCodergenHandler);
+    PipelineExecutor::new(registry)
+}
+
 // ---------------------------------------------------------------------------
 // Test 15: Condition-based routing with fail condition
 // ---------------------------------------------------------------------------
@@ -411,4 +421,140 @@ async fn condition_routes_to_fallback_on_no_match() {
         !result.completed_nodes.contains(&"fail_path".to_string()),
         "fail_path should not be taken"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Test 16: Quality handler passes in a simple pipeline
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn quality_pipeline_all_stages_pass() {
+    let tmp = tempfile::tempdir().unwrap();
+    // Workdir has no pas.toml → resolve() fails → falls back to quality_checks attr.
+    let graph = build_graph(
+        r#"digraph QualityPass {
+            start [shape="Mdiamond"]
+            verify [shape="box", type="quality", quality_checks="true"]
+            done [shape="Msquare"]
+            start -> verify -> done
+        }"#,
+    );
+
+    let ctx = Context::new();
+    ctx.set(
+        "n",
+        serde_json::Value::String(tmp.path().to_string_lossy().to_string()),
+    )
+    .await;
+
+    let result = executor_with_quality()
+        .run_with_context(&graph, ctx)
+        .await
+        .expect("pipeline with passing quality checks should succeed");
+
+    assert!(
+        result.completed_nodes.contains(&"verify".to_string()),
+        "verify node should be completed; got: {:?}",
+        result.completed_nodes
+    );
+    assert!(
+        result.completed_nodes.contains(&"done".to_string()),
+        "pipeline should reach done; got: {:?}",
+        result.completed_nodes
+    );
+    assert_eq!(
+        result.final_context.get("verify.completed"),
+        Some(&serde_json::Value::Bool(true)),
+        "verify.completed should be true"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Test 17: Quality loop aborts after exceeding max_fix_iterations
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn quality_loop_aborts_at_max_fix_iterations() {
+    let tmp = tempfile::tempdir().unwrap();
+    // Pipeline: start → verify (quality, always fails) → fix (mock) → verify → …
+    // With max_fix_iterations=1, the loop from fix into verify is allowed once,
+    // but aborts on the second re-entry from fix.
+    let graph = build_graph(
+        r#"digraph QualityLoopAbort {
+            start [shape="Mdiamond"]
+            verify [shape="box", type="quality", quality_checks="false"]
+            fix [shape="box"]
+            done [shape="Msquare"]
+            start -> verify
+            verify -> fix [condition="outcome=fail"]
+            verify -> done [condition="outcome=success"]
+            fix -> verify
+        }"#,
+    );
+
+    let ctx = Context::new();
+    ctx.set(
+        "n",
+        serde_json::Value::String(tmp.path().to_string_lossy().to_string()),
+    )
+    .await;
+    // max_fix_iterations=1 → the verify::fix counter aborts at iteration 2
+    ctx.set(
+        "quality_max_fix_iterations",
+        serde_json::json!(1u64),
+    )
+    .await;
+
+    let result = executor_with_quality()
+        .run_with_context(&graph, ctx)
+        .await;
+
+    assert!(
+        result.is_err(),
+        "pipeline should abort when quality loop exceeds max_fix_iterations"
+    );
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("max_fix_iterations"),
+        "error should mention max_fix_iterations; got: {err}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Test 18 (slow, ignored by default): Quality loop runs to exhaustion
+// ---------------------------------------------------------------------------
+
+#[ignore]
+#[tokio::test]
+async fn quality_loop_long() {
+    let tmp = tempfile::tempdir().unwrap();
+    let graph = build_graph(
+        r#"digraph QualityLoopLong {
+            start [shape="Mdiamond"]
+            verify [shape="box", type="quality", quality_checks="false"]
+            fix [shape="box"]
+            done [shape="Msquare"]
+            start -> verify
+            verify -> fix [condition="outcome=fail"]
+            verify -> done [condition="outcome=success"]
+            fix -> verify
+        }"#,
+    );
+
+    let ctx = Context::new();
+    ctx.set(
+        "n",
+        serde_json::Value::String(tmp.path().to_string_lossy().to_string()),
+    )
+    .await;
+    ctx.set("quality_max_fix_iterations", serde_json::json!(3u64)).await;
+
+    let result = executor_with_quality()
+        .run_with_context(&graph, ctx)
+        .await;
+
+    // Always-failing quality_checks → should still exhaust and abort
+    assert!(result.is_err(), "long loop should exhaust and abort");
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("max_fix_iterations"), "error should name the limit; got: {err}");
 }

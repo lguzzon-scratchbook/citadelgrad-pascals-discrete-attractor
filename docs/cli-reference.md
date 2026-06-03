@@ -59,7 +59,14 @@ Prints:
 | Code | Meaning |
 |------|---------|
 | 0 | Pipeline completed successfully |
-| 1 | Pipeline failed (validation error, handler error, or goal gate unsatisfied) |
+| 1 | Pipeline failed (validation error, handler error, goal gate unsatisfied, or quality loop exhausted) |
+| 2 | `pas.toml` found but not trusted — run `pas trust add` or set `PAS_TRUST_THIS=1` |
+
+#### Quality manifest warnings
+
+If a pipeline contains a `quality` node but no `pas.toml` is found in the working directory tree, `pas run` emits a `[WARN]` preflight diagnostic and continues. Stages will use the node's `quality_checks` attribute as a fallback; the manifest-driven stage list (`[quality.stages]`) is unavailable.
+
+To suppress the warning, run `pas init` in your project root to generate a `pas.toml`.
 
 ---
 
@@ -372,6 +379,145 @@ pas launch docs/implementation/ --dry-run
 # Write generated .dot files to a custom directory
 pas launch docs/implementation/ -w . -o build/pipelines/
 ```
+
+---
+
+### `init` — Initialise a `pas.toml` in your project
+
+Detects the project toolchain from well-known config files (`Cargo.toml`, `pyproject.toml`, `package.json`, …) and writes a starter `pas.toml` to the nearest `.git` root.
+
+```
+pas init [OPTIONS]
+```
+
+#### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--workdir <DIR>` | `.` (current directory) | Directory to inspect for toolchain detection and to write `pas.toml`. |
+| `--force` | false | Overwrite an existing `pas.toml` and proceed even without a `.git` root. |
+| `--non-interactive` | false | Never prompt; fail instead of asking questions. Suitable for CI. |
+| `--no-enrich` | false | Skip LLM enrichment for polyglot repos (always skipped in v1; reserved for future use). |
+| `--dry-run` | false | Print what would be written without touching the filesystem. |
+
+#### How it works
+
+1. Walks up from `--workdir` to find the nearest `.git` root.
+2. Detects the primary toolchain by looking for `Cargo.toml`, `pyproject.toml`, `package.json`, `go.mod`, etc.
+3. In interactive mode, shows a preview of the generated `pas.toml` and asks for confirmation.
+4. Writes `pas.toml` with `[project]`, `[toolchain]`, and `[quality]` sections pre-populated for the detected language.
+
+#### Generated file layout
+
+```toml
+[project]
+name = "my-project"
+version = "0.1.0"
+
+[toolchain]
+language = "rust"
+version = "1.80"
+
+[quality]
+stages = ["fmt", "lint", "test"]
+max_fix_iterations = 3
+
+[quality.hooks.fmt]
+cmd = "cargo fmt --check"
+
+[quality.hooks.lint]
+cmd = "cargo clippy -- -D warnings"
+
+[quality.hooks.test]
+cmd = "cargo test"
+```
+
+#### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | `pas.toml` written successfully (or `--dry-run` printed it) |
+| 1 | Error writing the file |
+| 4 | No `.git` root found and `--force` not passed in non-interactive mode |
+
+#### Examples
+
+```bash
+# Detect toolchain and write pas.toml interactively
+pas init
+
+# Dry-run: preview the generated file without writing it
+pas init --dry-run
+
+# CI-safe: non-interactive, fail if no .git root
+pas init --non-interactive
+
+# Force-write even without a .git root (e.g. in a monorepo subdirectory)
+pas init --force
+
+# Init for a project in a different directory
+pas init --workdir ~/projects/my-app
+```
+
+---
+
+### `trust` — Manage the pas.toml trust store
+
+Controls which `pas.toml` manifests are trusted to run quality stages. The trust store lives at `$XDG_CONFIG_HOME/pas/trusted.json` (default: `~/.config/pas/trusted.json`).
+
+```
+pas trust <ACTION>
+```
+
+#### Subcommands
+
+| Action | Description |
+|--------|-------------|
+| `add <PATH> <HASH>` | Add a manifest to the trust store by path + blake3 hash |
+| `remove <PATH> <HASH>` | Remove a manifest from the trust store |
+| `list` | Print all currently trusted manifests |
+
+#### Trust bypass environment variables
+
+| Variable | Value | Effect |
+|----------|-------|--------|
+| `PAS_TRUST_THIS` | `1` | Trust all manifests unconditionally (for development) |
+| `PAS_AGENT` | `1` | Non-interactive agent mode — never prompts, never trusts |
+| `PAS_NON_INTERACTIVE` | `1` | Suppress trust prompts in CI |
+
+#### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Action completed successfully |
+| 1 | Trust store corrupted or I/O error |
+| 2 | Manifest not trusted (checked at `pas run` time, not here) |
+| 3 | Trust store corrupted (deserialization failure) |
+
+#### Examples
+
+```bash
+# Add a manifest to the trust store
+pas trust add /path/to/project/pas.toml <blake3-hash>
+
+# List all trusted manifests
+pas trust list
+
+# Remove a manifest
+pas trust remove /path/to/project/pas.toml <blake3-hash>
+```
+
+---
+
+## Global exit code reference
+
+| Code | Meaning | Raised by |
+|------|---------|-----------|
+| 0 | Success | all commands |
+| 1 | General failure (validation error, handler error, quality loop exhausted) | `run`, `validate`, `launch`, `trust` |
+| 2 | Manifest not trusted | `run` (when quality stages attempted with untrusted `pas.toml`) |
+| 3 | Trust store corrupted | `run`, `trust` |
+| 4 | No `.git` root found without `--force` | `init` |
 
 ---
 
