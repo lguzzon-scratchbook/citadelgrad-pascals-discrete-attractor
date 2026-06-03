@@ -180,6 +180,12 @@ enum Commands {
         dry_run: bool,
     },
 
+    /// Manage the pas.toml trust store.
+    Trust {
+        #[command(subcommand)]
+        action: TrustAction,
+    },
+
     /// Generate, validate, and run pipelines end-to-end.
     ///
     /// Takes a directory containing spec files (and optional PRD files):
@@ -222,6 +228,26 @@ enum Commands {
         #[arg(long)]
         fresh: bool,
     },
+}
+
+#[derive(Subcommand)]
+enum TrustAction {
+    /// Add a manifest to the trust store
+    Add {
+        /// Path to the pas.toml file
+        path: PathBuf,
+        /// blake3 hash of the manifest
+        hash: String,
+    },
+    /// Remove a manifest from the trust store
+    Remove {
+        /// Path to the pas.toml file
+        path: PathBuf,
+        /// blake3 hash of the manifest
+        hash: String,
+    },
+    /// List all trusted manifests
+    List,
 }
 
 #[tokio::main]
@@ -374,6 +400,28 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
         }
+        Commands::Trust { action } => match action {
+            TrustAction::Add { path, hash } => {
+                attractor_quality::add_trust(&path, &hash, "flag")
+                    .map_err(|e| anyhow::anyhow!("{e}"))?;
+                println!("Trusted: {}", path.display());
+            }
+            TrustAction::Remove { path, hash } => {
+                attractor_quality::remove_trust(&path, &hash)
+                    .map_err(|e| anyhow::anyhow!("{e}"))?;
+                println!("Removed trust for: {}", path.display());
+            }
+            TrustAction::List => {
+                let entries = attractor_quality::list_trusted()
+                    .map_err(|e| anyhow::anyhow!("{e}"))?;
+                for e in &entries {
+                    println!("{} ({})", e.path, &e.blake3_hash[..16.min(e.blake3_hash.len())]);
+                }
+                if entries.is_empty() {
+                    println!("(no trusted manifests)");
+                }
+            }
+        },
     }
 
     Ok(())
