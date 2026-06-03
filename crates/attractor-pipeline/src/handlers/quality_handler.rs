@@ -70,9 +70,9 @@ impl NodeHandler for QualityHandler {
             return Ok(skip_outcome("Quality checks disabled via runtime flag"));
         }
 
-        // Determine workdir from context key "n"
+        // Determine workdir from the standard pipeline context key.
         let workdir: PathBuf = context
-            .get("n")
+            .get("workdir")
             .await
             .and_then(|v| v.as_str().map(PathBuf::from))
             .unwrap_or_else(|| {
@@ -205,7 +205,11 @@ impl NodeHandler for QualityHandler {
 
             // failure_footprint = blake3(stage_name || first_2KB(stderr))[..16]
             let failure_footprint = if !stage_ok {
-                let slice = &stderr_raw[..stderr_raw.len().min(2048)];
+                // Find a safe UTF-8 char boundary at or before 2048 bytes to avoid
+                // panicking when from_utf8_lossy inserted 3-byte replacement chars.
+                let max = stderr_raw.len().min(2048);
+                let safe_end = (0..=max).rev().find(|&i| stderr_raw.is_char_boundary(i)).unwrap_or(0);
+                let slice = &stderr_raw[..safe_end];
                 let input = format!("{}{}", stage.name, slice);
                 let hash = blake3::hash(input.as_bytes());
                 Some(hash.to_hex()[..16].to_string())

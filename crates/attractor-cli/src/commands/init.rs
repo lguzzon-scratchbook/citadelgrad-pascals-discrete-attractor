@@ -197,7 +197,7 @@ pub fn cmd_init(root: &Path, opts: &InitOpts) -> anyhow::Result<()> {
     let mut manifest_content = build_manifest(root, &toolchains);
 
     // ── interactive preview / edit ──────────────────────────────────────────
-    if !opts.is_non_interactive() && !opts.dry_run {
+    if !non_interactive && !opts.dry_run {
         // Print detected toolchains summary
         if toolchains.is_empty() {
             println!("Detected: (none)");

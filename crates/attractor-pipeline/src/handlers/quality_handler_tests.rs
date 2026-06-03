@@ -297,7 +297,7 @@ cmd = "true"
         let node = make_node("verify", "box", None, HashMap::new());
         let ctx = Context::default();
         ctx.set(
-            "n",
+            "workdir",
             serde_json::Value::String(tmp.path().to_string_lossy().to_string()),
         )
         .await;

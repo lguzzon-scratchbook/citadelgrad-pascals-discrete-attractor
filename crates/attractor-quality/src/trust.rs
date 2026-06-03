@@ -7,8 +7,6 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum TrustError {
-    #[error("manifest is not trusted")]
-    Untrusted,
     #[error("trust store is corrupted: {0}")]
     CorruptedStore(String),
 }

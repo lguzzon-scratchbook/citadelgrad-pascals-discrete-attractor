@@ -23,7 +23,7 @@ pub mod validation;
 pub use checkpoint::{clear_checkpoint, load_checkpoint, save_checkpoint, PipelineCheckpoint};
 pub use condition::{evaluate_condition, parse_condition, Clause, ConditionExpr, Operator};
 pub use edge_selection::select_edge;
-pub use engine::{PipelineConfig, PipelineExecutor, PipelineResult};
+pub use engine::{PipelineExecutor, PipelineResult};
 pub use events::{EventEmitter, PipelineEvent};
 pub use goal_gate::{check_goal_gates, enforce_goal_gates, GoalGateResult};
 pub use graph::{PipelineEdge, PipelineGraph, PipelineNode};

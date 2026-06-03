@@ -3,7 +3,7 @@
 //! Implements the 5-phase lifecycle: parse, validate, initialize, execute, finalize.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use attractor_types::{AttractorError, Context, Outcome, Result, StageStatus};
 
@@ -21,11 +21,6 @@ use crate::validation::validate_or_raise;
 /// The core pipeline executor. Owns a handler registry and drives graph traversal.
 pub struct PipelineExecutor {
     registry: HandlerRegistry,
-}
-
-/// Configuration for a pipeline run.
-pub struct PipelineConfig {
-    pub logs_root: PathBuf,
 }
 
 /// The result of a completed pipeline execution.
@@ -370,10 +365,17 @@ impl PipelineExecutor {
 
             match next_edge {
                 Some(edge) => {
+                    // Capture the just-completed node before any clear so prev_node_id
+                    // is always set to the node that actually executed, not whatever
+                    // remains at the tail of a post-clear completed_nodes.
+                    let just_completed = current_node.id.clone();
+
                     // Handle loop_restart
                     if edge.loop_restart {
                         completed_nodes.clear();
                         node_outcomes.clear();
+                        quality_loop_counters.clear();
+                        quality_last_footprint.clear();
                     }
                     let next_id = edge.to.clone();
                     current_node = graph.node(&next_id).ok_or_else(|| {
@@ -394,7 +396,7 @@ impl PipelineExecutor {
                         );
                         save_checkpoint(&cp, logs).await?;
                     }
-                    prev_node_id = Some(completed_nodes.last().cloned().unwrap_or_default());
+                    prev_node_id = Some(just_completed);
                 }
                 None => {
                     // No outgoing edge and not an exit node
