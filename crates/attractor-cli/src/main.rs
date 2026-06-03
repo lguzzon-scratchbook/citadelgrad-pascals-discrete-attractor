@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use commands::{
-    cmd_decompose, cmd_generate, cmd_generate_dir, cmd_info, cmd_launch, cmd_plan, cmd_run,
-    cmd_run_dir, cmd_scaffold, cmd_validate, validate_decomposition,
+    cmd_decompose, cmd_generate, cmd_generate_dir, cmd_info, cmd_init, cmd_launch, cmd_plan,
+    cmd_run, cmd_run_dir, cmd_scaffold, cmd_validate, validate_decomposition, InitOpts,
 };
 
 #[derive(Parser)]
@@ -152,6 +152,34 @@ enum Commands {
         output: Option<PathBuf>,
     },
 
+    /// Initialise a `pas.toml` in the current (or specified) project.
+    ///
+    /// Detects the project toolchain from well-known config files (Cargo.toml,
+    /// pyproject.toml, package.json, …) and writes a starter `pas.toml` to the
+    /// nearest `.git` root. If no `.git` is found the command exits with code 4
+    /// in non-interactive mode unless `--force` is given.
+    Init {
+        /// Working directory to inspect (default: current directory)
+        #[arg(long, default_value = ".")]
+        workdir: PathBuf,
+
+        /// Overwrite an existing `pas.toml` and proceed without a `.git` guard
+        #[arg(long)]
+        force: bool,
+
+        /// Never prompt; fail instead of asking questions
+        #[arg(long)]
+        non_interactive: bool,
+
+        /// Skip LLM enrichment (always true for now — enrichment is a future step)
+        #[arg(long)]
+        no_enrich: bool,
+
+        /// Print what would be written without touching the filesystem
+        #[arg(long)]
+        dry_run: bool,
+    },
+
     /// Generate, validate, and run pipelines end-to-end.
     ///
     /// Takes a directory containing spec files (and optional PRD files):
@@ -236,6 +264,21 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .await?;
             }
+        }
+        Commands::Init {
+            workdir,
+            force,
+            non_interactive,
+            no_enrich,
+            dry_run,
+        } => {
+            let opts = InitOpts {
+                force,
+                non_interactive,
+                no_enrich,
+                dry_run,
+            };
+            cmd_init(&workdir, &opts)?;
         }
         Commands::Validate { pipeline } => {
             cmd_validate(&pipeline)?;

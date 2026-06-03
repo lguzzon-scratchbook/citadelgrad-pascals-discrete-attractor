@@ -1,0 +1,14 @@
+[project]
+name = "{{name}}"
+
+[toolchain]
+language = "rust"
+
+[quality]
+stages = ["check", "test"]
+
+[quality.hooks.check]
+cmd = "cargo check"
+
+[quality.hooks.test]
+cmd = "cargo test"

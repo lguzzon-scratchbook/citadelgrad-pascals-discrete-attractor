@@ -1,0 +1,14 @@
+[project]
+name = "{{name}}"
+
+[toolchain]
+language = "python"
+
+[quality]
+stages = ["lint", "test"]
+
+[quality.hooks.lint]
+cmd = "ruff check ."
+
+[quality.hooks.test]
+cmd = "pytest"

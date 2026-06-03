@@ -1,0 +1,8 @@
+[project]
+name = "{{name}}"
+
+[quality]
+stages = ["check"]
+
+[quality.hooks.check]
+cmd = "echo 'no checks configured'"
