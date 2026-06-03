@@ -191,6 +191,7 @@ pub fn default_registry() -> HandlerRegistry {
     reg.register(ExitHandler);
     reg.register(ConditionalHandler);
     reg.register(crate::handlers::ToolHandler);
+    reg.register(crate::handlers::QualityHandler);
     reg.register(crate::handlers::CodergenHandler);
     reg.register(crate::handlers::ParallelHandler);
     reg.register(crate::handlers::FanInHandler);

@@ -1,0 +1,195 @@
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use attractor_dot::AttributeValue;
+    use attractor_types::{Context, StageStatus};
+
+    use crate::handler::default_registry;
+    use crate::handlers::quality_handler::QualityHandler;
+    use crate::handlers::tests::{make_minimal_graph, make_node};
+    use crate::handler::NodeHandler;
+
+    // -----------------------------------------------------------------------
+    // Test 1: disabled via node attribute (enabled=false)
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn quality_handler_disabled_via_node_attribute_returns_success() {
+        let handler = QualityHandler;
+        let mut attrs = HashMap::new();
+        attrs.insert("enabled".into(), AttributeValue::Boolean(false));
+        let node = make_node("verify", "box", None, attrs);
+        let ctx = Context::default();
+        let graph = make_minimal_graph();
+
+        let outcome = handler.execute(&node, &ctx, &graph).await.unwrap();
+        assert_eq!(outcome.status, StageStatus::Success);
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 2: disabled via runtime context flag
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn quality_handler_disabled_via_runtime_flag_returns_success() {
+        let handler = QualityHandler;
+        let node = make_node("verify", "box", None, HashMap::new());
+        let ctx = Context::default();
+        ctx.set("quality_disabled", serde_json::Value::Bool(true)).await;
+        let graph = make_minimal_graph();
+
+        let outcome = handler.execute(&node, &ctx, &graph).await.unwrap();
+        assert_eq!(outcome.status, StageStatus::Success);
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 3: error on missing quality_checks attribute
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn quality_handler_errors_on_missing_quality_checks() {
+        let handler = QualityHandler;
+        // node_type="quality" but no quality_checks attribute
+        let mut node = make_node("verify", "box", None, HashMap::new());
+        node.node_type = Some("quality".into());
+        let ctx = Context::default();
+        let graph = make_minimal_graph();
+
+        let result = handler.execute(&node, &ctx, &graph).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("quality_checks"),
+            "Expected error mentioning 'quality_checks', got: {err}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 4: all checks pass → Success + context written
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn quality_handler_all_checks_pass_returns_success() {
+        let handler = QualityHandler;
+        let mut attrs = HashMap::new();
+        // "true" is a shell built-in that always exits 0
+        attrs.insert(
+            "quality_checks".into(),
+            AttributeValue::String("true|true".into()),
+        );
+        let node = make_node("verify", "box", None, attrs);
+        let ctx = Context::default();
+        let graph = make_minimal_graph();
+
+        let outcome = handler.execute(&node, &ctx, &graph).await.unwrap();
+        assert_eq!(outcome.status, StageStatus::Success);
+
+        // verify.completed = true
+        assert_eq!(
+            outcome.context_updates.get("verify.completed"),
+            Some(&serde_json::Value::Bool(true)),
+            "Expected verify.completed = true in context_updates"
+        );
+
+        // verify.results is a JSON array with 2 entries, both passed=true
+        let results = outcome
+            .context_updates
+            .get("verify.results")
+            .expect("verify.results should be in context_updates");
+        let arr = results.as_array().expect("verify.results should be a JSON array");
+        assert_eq!(arr.len(), 2, "Expected 2 result entries");
+        for entry in arr {
+            assert_eq!(
+                entry.get("passed").and_then(|v| v.as_bool()),
+                Some(true),
+                "Expected each entry to have passed=true, got: {entry}"
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 5: fail-fast on first failure
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn quality_handler_fail_fast_on_first_failure() {
+        let handler = QualityHandler;
+        let mut attrs = HashMap::new();
+        // "false" exits 1; "true" exits 0 — only the first should run
+        attrs.insert(
+            "quality_checks".into(),
+            AttributeValue::String("false|true".into()),
+        );
+        let node = make_node("verify", "box", None, attrs);
+        let ctx = Context::default();
+        let graph = make_minimal_graph();
+
+        let outcome = handler.execute(&node, &ctx, &graph).await.unwrap();
+        assert_eq!(outcome.status, StageStatus::Fail);
+
+        // Only 1 result entry — second command must not have run
+        let results = outcome
+            .context_updates
+            .get("verify.results")
+            .expect("verify.results should be in context_updates");
+        let arr = results.as_array().expect("verify.results should be a JSON array");
+        assert_eq!(arr.len(), 1, "Only first command should have run (fail-fast)");
+
+        // First entry should have passed=false
+        assert_eq!(
+            arr[0].get("passed").and_then(|v| v.as_bool()),
+            Some(false),
+            "First result should have passed=false"
+        );
+
+        // failure_reason must be set
+        assert!(
+            outcome.failure_reason.is_some(),
+            "failure_reason should be set on Fail outcome"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 6: failure_summary contains stderr from failing command
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn quality_handler_failure_summary_contains_stderr() {
+        let handler = QualityHandler;
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "quality_checks".into(),
+            AttributeValue::String("sh -c 'echo OOPS >&2; exit 1'".into()),
+        );
+        let node = make_node("verify", "box", None, attrs);
+        let ctx = Context::default();
+        let graph = make_minimal_graph();
+
+        let outcome = handler.execute(&node, &ctx, &graph).await.unwrap();
+        assert_eq!(outcome.status, StageStatus::Fail);
+
+        let summary = outcome
+            .context_updates
+            .get("verify.failure_summary")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        assert!(
+            summary.contains("OOPS"),
+            "failure_summary should contain stderr 'OOPS', got: {summary:?}"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 7: QualityHandler appears in default_registry()
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn quality_handler_registers_in_default_registry() {
+        let reg = default_registry();
+        assert!(
+            reg.has("quality"),
+            "default_registry() should include the 'quality' handler"
+        );
+    }
+}

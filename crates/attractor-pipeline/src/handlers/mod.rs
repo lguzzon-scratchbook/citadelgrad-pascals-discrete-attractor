@@ -3,17 +3,22 @@
 pub mod codergen_handler;
 pub mod manager;
 pub mod parallel;
+pub mod quality_handler;
 pub mod tool_handler;
 pub mod wait_human;
 
 pub use codergen_handler::CodergenHandler;
 pub use manager::ManagerLoopHandler;
 pub use parallel::{FanInHandler, ParallelHandler};
+pub use quality_handler::QualityHandler;
 pub use tool_handler::ToolHandler;
 
 // ---------------------------------------------------------------------------
 // Shared test helpers used by child handler modules
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+pub(crate) mod quality_handler_tests;
 
 #[cfg(test)]
 pub(crate) mod tests {
