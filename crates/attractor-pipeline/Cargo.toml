@@ -8,6 +8,7 @@ description = "Pipeline execution engine, node handlers, validation, and edge se
 [dependencies]
 attractor-types = { path = "../attractor-types" }
 attractor-dot = { path = "../attractor-dot" }
+attractor-quality = { path = "../attractor-quality" }
 attractor-llm = { path = "../attractor-llm" }
 attractor-tools = { path = "../attractor-tools" }
 attractor-agent = { path = "../attractor-agent" }
