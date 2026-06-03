@@ -1,6 +1,6 @@
 use super::*;
 use crate::graph::PipelineGraph;
-use crate::handler::{HandlerRegistry, NodeHandler, StartHandler, ExitHandler, ConditionalHandler};
+use crate::handler::{ConditionalHandler, ExitHandler, HandlerRegistry, NodeHandler, StartHandler};
 use async_trait::async_trait;
 
 fn parse_graph(dot: &str) -> PipelineGraph {
@@ -74,18 +74,9 @@ async fn linear_pipeline_completes() {
     assert!(result.node_outcomes.contains_key("start"));
     assert!(result.node_outcomes.contains_key("process"));
     assert!(result.node_outcomes.contains_key("done"));
-    assert_eq!(
-        result.node_outcomes["start"].status,
-        StageStatus::Success
-    );
-    assert_eq!(
-        result.node_outcomes["process"].status,
-        StageStatus::Success
-    );
-    assert_eq!(
-        result.node_outcomes["done"].status,
-        StageStatus::Success
-    );
+    assert_eq!(result.node_outcomes["start"].status, StageStatus::Success);
+    assert_eq!(result.node_outcomes["process"].status, StageStatus::Success);
+    assert_eq!(result.node_outcomes["done"].status, StageStatus::Success);
 }
 
 // Test 2: Branching pipeline routes based on conditions
@@ -198,9 +189,9 @@ async fn goal_gate_failure_with_retry_loops_back() {
 #[tokio::test]
 async fn goal_gate_failure_without_retry_returns_error() {
     // To test this, we need a custom handler that returns Fail for the goal gate node.
-    use async_trait::async_trait;
-    use crate::handler::NodeHandler;
     use crate::graph::PipelineNode;
+    use crate::handler::NodeHandler;
+    use async_trait::async_trait;
 
     struct FailHandler;
 
@@ -250,9 +241,9 @@ async fn goal_gate_failure_without_retry_returns_error() {
 // Test 7: Goal gate failure with retry target retries correctly
 #[tokio::test]
 async fn goal_gate_failure_with_retry_target_retries() {
-    use async_trait::async_trait;
-    use crate::handler::NodeHandler;
     use crate::graph::PipelineNode;
+    use crate::handler::NodeHandler;
+    use async_trait::async_trait;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
 
@@ -445,10 +436,7 @@ async fn budget_limit_aborts_pipeline() {
                 format!("{}.completed", node.id),
                 serde_json::Value::Bool(true),
             );
-            updates.insert(
-                format!("{}.cost_usd", node.id),
-                serde_json::json!(1.50),
-            );
+            updates.insert(format!("{}.cost_usd", node.id), serde_json::json!(1.50));
             Ok(Outcome {
                 status: StageStatus::Success,
                 preferred_label: None,

@@ -73,20 +73,15 @@ impl GeminiAdapter {
         });
 
         if !system_texts.is_empty() {
-            let parts: Vec<serde_json::Value> = system_texts
-                .iter()
-                .map(|t| json!({ "text": t }))
-                .collect();
+            let parts: Vec<serde_json::Value> =
+                system_texts.iter().map(|t| json!({ "text": t })).collect();
             body["systemInstruction"] = json!({ "parts": parts });
         }
 
         // 4. Tools (functionDeclarations)
         if !request.tools.is_empty() {
-            let declarations: Vec<serde_json::Value> = request
-                .tools
-                .iter()
-                .map(convert_tool_definition)
-                .collect();
+            let declarations: Vec<serde_json::Value> =
+                request.tools.iter().map(convert_tool_definition).collect();
             body["tools"] = json!([{ "functionDeclarations": declarations }]);
         }
 
@@ -109,21 +104,24 @@ impl GeminiAdapter {
     }
 
     fn parse_response(&self, json: serde_json::Value) -> Result<Response, AttractorError> {
-        let candidates = json["candidates"]
-            .as_array()
+        let candidates =
+            json["candidates"]
+                .as_array()
+                .ok_or_else(|| AttractorError::ProviderError {
+                    provider: "google".into(),
+                    status: 0,
+                    message: "Missing candidates in response".into(),
+                    retryable: false,
+                })?;
+
+        let candidate = candidates
+            .first()
             .ok_or_else(|| AttractorError::ProviderError {
                 provider: "google".into(),
                 status: 0,
-                message: "Missing candidates in response".into(),
+                message: "Empty candidates array".into(),
                 retryable: false,
             })?;
-
-        let candidate = candidates.first().ok_or_else(|| AttractorError::ProviderError {
-            provider: "google".into(),
-            status: 0,
-            message: "Empty candidates array".into(),
-            retryable: false,
-        })?;
 
         // Parse finish reason
         let finish_reason = match candidate["finishReason"].as_str() {
@@ -333,12 +331,15 @@ impl ProviderAdapter for GeminiAdapter {
             })?;
 
         let status = resp.status();
-        let response_body = resp.text().await.map_err(|e| AttractorError::ProviderError {
-            provider: "google".into(),
-            status: 0,
-            message: e.to_string(),
-            retryable: true,
-        })?;
+        let response_body = resp
+            .text()
+            .await
+            .map_err(|e| AttractorError::ProviderError {
+                provider: "google".into(),
+                status: 0,
+                message: e.to_string(),
+                retryable: true,
+            })?;
 
         if !status.is_success() {
             return Err(map_error(status, &response_body));
@@ -357,10 +358,7 @@ impl ProviderAdapter for GeminiAdapter {
         Ok(response)
     }
 
-    fn stream(
-        &self,
-        _request: &Request,
-    ) -> Pin<Box<dyn Stream<Item = StreamEvent> + Send + '_>> {
+    fn stream(&self, _request: &Request) -> Pin<Box<dyn Stream<Item = StreamEvent> + Send + '_>> {
         Box::pin(tokio_stream::empty::<StreamEvent>())
     }
 

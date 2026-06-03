@@ -4,10 +4,7 @@ use crate::{DynProvider, Message, ToolDefinition};
 fn make_basic_request() -> Request {
     Request {
         model: "gemini-2.5-pro".into(),
-        messages: vec![
-            Message::system("You are helpful."),
-            Message::user("Hello"),
-        ],
+        messages: vec![Message::system("You are helpful."), Message::user("Hello")],
         tools: vec![],
         tool_choice: None,
         max_tokens: Some(1024),
@@ -25,7 +22,9 @@ fn new_sets_api_key() {
     let adapter = GeminiAdapter::new("test-google-key".into());
     assert_eq!(adapter.api_key, "test-google-key");
     assert_eq!(adapter.default_model, "gemini-2.5-pro");
-    assert!(adapter.base_url.contains("generativelanguage.googleapis.com"));
+    assert!(adapter
+        .base_url
+        .contains("generativelanguage.googleapis.com"));
 }
 
 // Test 2: from_env without any key returns Err
@@ -174,8 +173,8 @@ fn build_request_body_includes_generation_config() {
 // Test 8: with_base_url overrides the default URL
 #[test]
 fn with_base_url_overrides_default() {
-    let adapter = GeminiAdapter::new("key".into())
-        .with_base_url("https://custom.example.com".into());
+    let adapter =
+        GeminiAdapter::new("key".into()).with_base_url("https://custom.example.com".into());
     assert_eq!(adapter.base_url, "https://custom.example.com");
 }
 

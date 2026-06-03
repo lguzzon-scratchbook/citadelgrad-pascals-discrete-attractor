@@ -4,10 +4,7 @@ use crate::{Message, ReasoningEffort, ToolDefinition};
 fn make_basic_request() -> Request {
     Request {
         model: "gpt-4o".into(),
-        messages: vec![
-            Message::system("You are helpful."),
-            Message::user("Hello"),
-        ],
+        messages: vec![Message::system("You are helpful."), Message::user("Hello")],
         tools: vec![],
         tool_choice: None,
         max_tokens: Some(4096),
@@ -183,8 +180,7 @@ fn parse_response_handles_incomplete_status() {
 
 #[test]
 fn with_base_url_sets_custom_url() {
-    let adapter = OpenAiAdapter::new("key".into())
-        .with_base_url("https://custom.api.com".into());
+    let adapter = OpenAiAdapter::new("key".into()).with_base_url("https://custom.api.com".into());
     assert_eq!(adapter.base_url, "https://custom.api.com");
 }
 
@@ -194,7 +190,13 @@ fn error_mapping_429_rate_limited() {
         reqwest::StatusCode::TOO_MANY_REQUESTS,
         r#"{"error": {"message": "rate limited", "retry_after": 3.0}}"#,
     );
-    assert!(matches!(err, AttractorError::RateLimited { retry_after_ms: 3000, .. }));
+    assert!(matches!(
+        err,
+        AttractorError::RateLimited {
+            retry_after_ms: 3000,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -213,7 +215,9 @@ fn error_mapping_500_retryable() {
         r#"{"error": {"message": "server error"}}"#,
     );
     match &err {
-        AttractorError::ProviderError { retryable, status, .. } => {
+        AttractorError::ProviderError {
+            retryable, status, ..
+        } => {
             assert!(*retryable);
             assert_eq!(*status, 500);
         }

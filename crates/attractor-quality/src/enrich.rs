@@ -18,10 +18,17 @@ const ALLOWED_FILENAMES: &[&str] = &[
     "pom.xml",
     "Makefile",
     "CMakeLists.txt",
+    "tsconfig.json",
 ];
 
 const SECRET_PATTERNS: &[&str] = &[
-    ".env", "secret", "credential", "password", "token", "key", "private",
+    ".env",
+    "secret",
+    "credential",
+    "password",
+    "token",
+    "key",
+    "private",
 ];
 
 const MAX_FILES: usize = 256;
@@ -55,8 +62,9 @@ pub(crate) fn filter_files(files: &[PathBuf]) -> Vec<&PathBuf> {
             let allowed = ALLOWED_FILENAMES.iter().any(|allowed| {
                 let allowed_lower = allowed.to_lowercase();
                 name == allowed_lower
-                    || (allowed_lower.starts_with("tsconfig") && name.starts_with("tsconfig"))
-                    || (allowed_lower.starts_with("requirements") && name.starts_with("requirements"))
+                    || (name.starts_with("tsconfig.") && name.ends_with(".json"))
+                    || (allowed_lower.starts_with("requirements")
+                        && name.starts_with("requirements"))
             });
 
             allowed
@@ -149,10 +157,15 @@ mod tests {
 
     #[test]
     fn file_filter_limits_to_max_entries() {
+        let tmp = tempfile::TempDir::new().unwrap();
         let files: Vec<PathBuf> = (0..300)
-            .map(|i| PathBuf::from(format!("Cargo{}.toml", i)))
+            .map(|i| {
+                let path = tmp.path().join(format!("tsconfig.{i}.json"));
+                std::fs::write(&path, "").unwrap();
+                path
+            })
             .collect();
         let filtered = filter_files(&files);
-        assert!(filtered.len() <= MAX_FILES);
+        assert_eq!(filtered.len(), MAX_FILES);
     }
 }

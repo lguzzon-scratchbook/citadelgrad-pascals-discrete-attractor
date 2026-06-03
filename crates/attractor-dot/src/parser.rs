@@ -222,7 +222,9 @@ fn node_or_edge_stmt(input: &mut &str) -> ModalResult<Statement> {
 
     // Check for '--' to give a better error
     if opt(literal("--")).parse_next(input)?.is_some() {
-        return Err(make_cut_error("only directed edges (->); undirected edges (--) are not supported"));
+        return Err(make_cut_error(
+            "only directed edges (->); undirected edges (--) are not supported",
+        ));
     }
 
     // Check if there's an attr block => node with attrs
@@ -279,12 +281,12 @@ fn statements(input: &mut &str) -> ModalResult<Vec<Statement>> {
 }
 
 type MergeResult = (
-    HashMap<String, AttributeValue>,   // graph attrs
-    HashMap<String, NodeDef>,          // nodes
-    Vec<EdgeDef>,                      // edges
-    Vec<SubgraphDef>,                  // subgraphs
-    HashMap<String, AttributeValue>,   // node defaults
-    HashMap<String, AttributeValue>,   // edge defaults
+    HashMap<String, AttributeValue>, // graph attrs
+    HashMap<String, NodeDef>,        // nodes
+    Vec<EdgeDef>,                    // edges
+    Vec<SubgraphDef>,                // subgraphs
+    HashMap<String, AttributeValue>, // node defaults
+    HashMap<String, AttributeValue>, // edge defaults
 );
 
 /// Merge statements into a DotGraph-like structure.
@@ -367,7 +369,14 @@ fn merge_statements(
         }
     }
 
-    (graph_attrs, nodes, edges, subgraphs, node_defaults, edge_defaults)
+    (
+        graph_attrs,
+        nodes,
+        edges,
+        subgraphs,
+        node_defaults,
+        edge_defaults,
+    )
 }
 
 /// Top-level parser: 'digraph' identifier '{' statements '}'.
@@ -376,7 +385,9 @@ fn parse_digraph(input: &mut &str) -> ModalResult<DotGraph> {
 
     // Reject 'strict'
     if input.starts_with("strict") {
-        return Err(make_cut_error("'digraph' keyword (strict graphs are not supported)"));
+        return Err(make_cut_error(
+            "'digraph' keyword (strict graphs are not supported)",
+        ));
     }
 
     // Reject undirected 'graph'
@@ -384,7 +395,9 @@ fn parse_digraph(input: &mut &str) -> ModalResult<DotGraph> {
         let after = &input[5..];
         let trimmed = after.trim_start();
         if trimmed.starts_with('{') || trimmed.starts_with(|c: char| c.is_ascii_alphabetic()) {
-            return Err(make_cut_error("'digraph' keyword (undirected graphs are not supported)"));
+            return Err(make_cut_error(
+                "'digraph' keyword (undirected graphs are not supported)",
+            ));
         }
     }
 

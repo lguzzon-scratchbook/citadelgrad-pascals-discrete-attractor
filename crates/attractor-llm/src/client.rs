@@ -245,9 +245,7 @@ impl LlmClient {
             return Ok(provider);
         }
 
-        Err(AttractorError::Other(
-            "No providers registered".to_string(),
-        ))
+        Err(AttractorError::Other("No providers registered".to_string()))
     }
 
     /// Create from environment variables (detect available API keys).

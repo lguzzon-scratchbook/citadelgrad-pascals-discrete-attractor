@@ -39,10 +39,7 @@ impl ProviderAdapter for MockProvider {
         })
     }
 
-    fn stream(
-        &self,
-        _request: &Request,
-    ) -> Pin<Box<dyn Stream<Item = StreamEvent> + Send + '_>> {
+    fn stream(&self, _request: &Request) -> Pin<Box<dyn Stream<Item = StreamEvent> + Send + '_>> {
         Box::pin(tokio_stream::empty::<StreamEvent>())
     }
 
@@ -290,9 +287,6 @@ fn model_catalog_provider_for_model() {
         Some("anthropic")
     );
     assert_eq!(catalog.provider_for_model("gpt-4o"), Some("openai"));
-    assert_eq!(
-        catalog.provider_for_model("gemini-2.5-pro"),
-        Some("google")
-    );
+    assert_eq!(catalog.provider_for_model("gemini-2.5-pro"), Some("google"));
     assert_eq!(catalog.provider_for_model("unknown"), None);
 }

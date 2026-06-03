@@ -1,8 +1,8 @@
 //! Pipeline outcome, status, checkpoint, and fidelity types.
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
 

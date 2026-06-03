@@ -129,10 +129,7 @@ impl NodeHandler for CodergenHandler {
         // If this is a conditional node, instruct the LLM to output a label
         if node.shape == "diamond" || node.node_type.as_deref() == Some("conditional") {
             let edges = graph.outgoing_edges(&node.id);
-            let labels: Vec<_> = edges
-                .iter()
-                .filter_map(|e| e.label.as_deref())
-                .collect();
+            let labels: Vec<_> = edges.iter().filter_map(|e| e.label.as_deref()).collect();
             if !labels.is_empty() {
                 full_prompt.push_str(&format!(
                     "\n\nYou MUST end your response with exactly one of these labels on its own line: {}",
@@ -186,9 +183,7 @@ impl NodeHandler for CodergenHandler {
         // Child. On timeout, we kill the process tree — tokio::time::timeout
         // only drops the future, it does NOT kill the child process.
         let child_pid = child.id();
-        let timeout_dur = node
-            .timeout
-            .unwrap_or(std::time::Duration::from_secs(600));
+        let timeout_dur = node.timeout.unwrap_or(std::time::Duration::from_secs(600));
         let output = match tokio::time::timeout(timeout_dur, child.wait_with_output()).await {
             Ok(result) => result.map_err(|e| AttractorError::HandlerError {
                 handler: "codergen".into(),
@@ -254,15 +249,14 @@ impl NodeHandler for CodergenHandler {
         };
 
         // Extract preferred_label from the response for conditional routing
-        let preferred_label = if node.shape == "diamond"
-            || node.node_type.as_deref() == Some("conditional")
-        {
-            let edges = graph.outgoing_edges(&node.id);
-            let labels: Vec<String> = edges.iter().filter_map(|e| e.label.clone()).collect();
-            extract_label(&cli_result.text, &labels)
-        } else {
-            None
-        };
+        let preferred_label =
+            if node.shape == "diamond" || node.node_type.as_deref() == Some("conditional") {
+                let edges = graph.outgoing_edges(&node.id);
+                let labels: Vec<String> = edges.iter().filter_map(|e| e.label.clone()).collect();
+                extract_label(&cli_result.text, &labels)
+            } else {
+                None
+            };
 
         // Build context updates
         let mut updates = HashMap::new();

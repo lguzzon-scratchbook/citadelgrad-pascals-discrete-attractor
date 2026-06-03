@@ -79,7 +79,9 @@ fn is_llm_node(shape: &str) -> bool {
 
 struct StartNodeRule;
 impl LintRule for StartNodeRule {
-    fn name(&self) -> &str { "start_node" }
+    fn name(&self) -> &str {
+        "start_node"
+    }
     fn apply(&self, graph: &PipelineGraph) -> Vec<Diagnostic> {
         let starts: Vec<_> = graph
             .all_nodes()
@@ -101,7 +103,11 @@ impl LintRule for StartNodeRule {
                 message: format!(
                     "Pipeline has {} start nodes: {}; expected exactly one",
                     starts.len(),
-                    starts.iter().map(|n| n.id.as_str()).collect::<Vec<_>>().join(", ")
+                    starts
+                        .iter()
+                        .map(|n| n.id.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
                 ),
                 node_id: None,
                 edge: None,
@@ -115,11 +121,11 @@ impl LintRule for StartNodeRule {
 
 struct TerminalNodeRule;
 impl LintRule for TerminalNodeRule {
-    fn name(&self) -> &str { "terminal_node" }
+    fn name(&self) -> &str {
+        "terminal_node"
+    }
     fn apply(&self, graph: &PipelineGraph) -> Vec<Diagnostic> {
-        let has_terminal = graph
-            .all_nodes()
-            .any(|n| is_terminal_node(&n.id, &n.shape));
+        let has_terminal = graph.all_nodes().any(|n| is_terminal_node(&n.id, &n.shape));
         if !has_terminal {
             vec![Diagnostic {
                 rule: self.name().into(),
@@ -137,7 +143,9 @@ impl LintRule for TerminalNodeRule {
 
 struct ReachabilityRule;
 impl LintRule for ReachabilityRule {
-    fn name(&self) -> &str { "reachability" }
+    fn name(&self) -> &str {
+        "reachability"
+    }
     fn apply(&self, graph: &PipelineGraph) -> Vec<Diagnostic> {
         let start = graph.start_node();
         let start_id = match start {
@@ -177,7 +185,9 @@ impl LintRule for ReachabilityRule {
 
 struct EdgeTargetExistsRule;
 impl LintRule for EdgeTargetExistsRule {
-    fn name(&self) -> &str { "edge_target_exists" }
+    fn name(&self) -> &str {
+        "edge_target_exists"
+    }
     fn apply(&self, graph: &PipelineGraph) -> Vec<Diagnostic> {
         graph
             .all_edges()
@@ -186,7 +196,10 @@ impl LintRule for EdgeTargetExistsRule {
             .map(|e| Diagnostic {
                 rule: self.name().into(),
                 severity: Severity::Error,
-                message: format!("Edge {} -> {} references non-existent target '{}'", e.from, e.to, e.to),
+                message: format!(
+                    "Edge {} -> {} references non-existent target '{}'",
+                    e.from, e.to, e.to
+                ),
                 node_id: None,
                 edge: Some((e.from.clone(), e.to.clone())),
                 fix: Some(format!("Add node '{}' or fix the edge target", e.to)),
@@ -197,7 +210,9 @@ impl LintRule for EdgeTargetExistsRule {
 
 struct StartNoIncomingRule;
 impl LintRule for StartNoIncomingRule {
-    fn name(&self) -> &str { "start_no_incoming" }
+    fn name(&self) -> &str {
+        "start_no_incoming"
+    }
     fn apply(&self, graph: &PipelineGraph) -> Vec<Diagnostic> {
         let start = match graph.start_node() {
             Some(n) => n.id.clone(),
@@ -221,7 +236,9 @@ impl LintRule for StartNoIncomingRule {
 
 struct ExitNoOutgoingRule;
 impl LintRule for ExitNoOutgoingRule {
-    fn name(&self) -> &str { "exit_no_outgoing" }
+    fn name(&self) -> &str {
+        "exit_no_outgoing"
+    }
     fn apply(&self, graph: &PipelineGraph) -> Vec<Diagnostic> {
         graph
             .all_nodes()
@@ -241,7 +258,9 @@ impl LintRule for ExitNoOutgoingRule {
 
 struct ConditionSyntaxRule;
 impl LintRule for ConditionSyntaxRule {
-    fn name(&self) -> &str { "condition_syntax" }
+    fn name(&self) -> &str {
+        "condition_syntax"
+    }
     fn apply(&self, graph: &PipelineGraph) -> Vec<Diagnostic> {
         graph
             .all_edges()
@@ -269,7 +288,9 @@ impl LintRule for ConditionSyntaxRule {
 
 struct FidelityValidRule;
 impl LintRule for FidelityValidRule {
-    fn name(&self) -> &str { "fidelity_valid" }
+    fn name(&self) -> &str {
+        "fidelity_valid"
+    }
     fn apply(&self, graph: &PipelineGraph) -> Vec<Diagnostic> {
         let mut diags = Vec::new();
         for node in graph.all_nodes() {
@@ -278,13 +299,12 @@ impl LintRule for FidelityValidRule {
                     diags.push(Diagnostic {
                         rule: self.name().into(),
                         severity: Severity::Warning,
-                        message: format!(
-                            "Node '{}' has invalid fidelity value '{f}'",
-                            node.id
-                        ),
+                        message: format!("Node '{}' has invalid fidelity value '{f}'", node.id),
                         node_id: Some(node.id.clone()),
                         edge: None,
-                        fix: Some("Use one of: full, truncate, compact, summary, summary:<level>".into()),
+                        fix: Some(
+                            "Use one of: full, truncate, compact, summary, summary:<level>".into(),
+                        ),
                     });
                 }
             }
@@ -301,7 +321,9 @@ impl LintRule for FidelityValidRule {
                         ),
                         node_id: None,
                         edge: Some((edge.from.clone(), edge.to.clone())),
-                        fix: Some("Use one of: full, truncate, compact, summary, summary:<level>".into()),
+                        fix: Some(
+                            "Use one of: full, truncate, compact, summary, summary:<level>".into(),
+                        ),
                     });
                 }
             }
@@ -312,7 +334,9 @@ impl LintRule for FidelityValidRule {
 
 struct RetryTargetExistsRule;
 impl LintRule for RetryTargetExistsRule {
-    fn name(&self) -> &str { "retry_target_exists" }
+    fn name(&self) -> &str {
+        "retry_target_exists"
+    }
     fn apply(&self, graph: &PipelineGraph) -> Vec<Diagnostic> {
         let mut diags = Vec::new();
         for node in graph.all_nodes() {
@@ -353,7 +377,9 @@ impl LintRule for RetryTargetExistsRule {
 
 struct GoalGateHasRetryRule;
 impl LintRule for GoalGateHasRetryRule {
-    fn name(&self) -> &str { "goal_gate_has_retry" }
+    fn name(&self) -> &str {
+        "goal_gate_has_retry"
+    }
     fn apply(&self, graph: &PipelineGraph) -> Vec<Diagnostic> {
         graph
             .all_nodes()
@@ -361,10 +387,7 @@ impl LintRule for GoalGateHasRetryRule {
             .map(|n| Diagnostic {
                 rule: self.name().into(),
                 severity: Severity::Warning,
-                message: format!(
-                    "Node '{}' has goal_gate=true but no retry_target",
-                    n.id
-                ),
+                message: format!("Node '{}' has goal_gate=true but no retry_target", n.id),
                 node_id: Some(n.id.clone()),
                 edge: None,
                 fix: Some("Add a retry_target attribute so the goal gate can retry".into()),
@@ -409,7 +432,9 @@ impl LintRule for ProviderValidRule {
 
 struct PromptOnLlmNodesRule;
 impl LintRule for PromptOnLlmNodesRule {
-    fn name(&self) -> &str { "prompt_on_llm_nodes" }
+    fn name(&self) -> &str {
+        "prompt_on_llm_nodes"
+    }
     fn apply(&self, graph: &PipelineGraph) -> Vec<Diagnostic> {
         graph
             .all_nodes()

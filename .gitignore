@@ -5,6 +5,8 @@
 .envrc
 .DS_Store
 .tldr/cache/
+.claude/
+.superpowers/
 
 # Beads / Dolt files (added by bd init)
 .dolt/

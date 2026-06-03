@@ -91,12 +91,7 @@ pub(super) fn boolean_value(input: &mut &str) -> ModalResult<bool> {
 
 /// Parse a float: optional sign, digits, '.', digits.
 pub(super) fn float_value(input: &mut &str) -> ModalResult<f64> {
-    let s: &str = (
-        opt(alt(('-', '+'))),
-        digit1,
-        '.',
-        digit1,
-    )
+    let s: &str = (opt(alt(('-', '+'))), digit1, '.', digit1)
         .take()
         .parse_next(input)?;
     s.parse()
@@ -105,9 +100,7 @@ pub(super) fn float_value(input: &mut &str) -> ModalResult<f64> {
 
 /// Parse an integer: optional sign + digits.
 pub(super) fn integer_value(input: &mut &str) -> ModalResult<i64> {
-    let s: &str = (opt(alt(('-', '+'))), digit1)
-        .take()
-        .parse_next(input)?;
+    let s: &str = (opt(alt(('-', '+'))), digit1).take().parse_next(input)?;
     s.parse()
         .map_err(|_| ErrMode::Backtrack(ContextError::new()))
 }

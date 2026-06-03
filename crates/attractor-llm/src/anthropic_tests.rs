@@ -4,10 +4,7 @@ use crate::{ContentPart, DynProvider, Message, ToolDefinition};
 fn make_basic_request() -> Request {
     Request {
         model: "claude-sonnet-4-5-20250929".into(),
-        messages: vec![
-            Message::system("You are helpful."),
-            Message::user("Hello"),
-        ],
+        messages: vec![Message::system("You are helpful."), Message::user("Hello")],
         tools: vec![],
         tool_choice: None,
         max_tokens: Some(1024),
@@ -25,7 +22,9 @@ fn build_request_body_extracts_system_messages() {
     let body = build_request_body(&req);
 
     // System should be a top-level array
-    let system = body["system"].as_array().expect("system should be an array");
+    let system = body["system"]
+        .as_array()
+        .expect("system should be an array");
     assert_eq!(system.len(), 1);
     assert_eq!(system[0]["type"], "text");
     assert_eq!(system[0]["text"], "You are helpful.");
@@ -159,7 +158,13 @@ fn error_mapping_429_rate_limited() {
         reqwest::StatusCode::TOO_MANY_REQUESTS,
         r#"{"error": {"message": "rate limited", "retry_after": 2.5}}"#,
     );
-    assert!(matches!(err, AttractorError::RateLimited { retry_after_ms: 2500, .. }));
+    assert!(matches!(
+        err,
+        AttractorError::RateLimited {
+            retry_after_ms: 2500,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -178,7 +183,9 @@ fn error_mapping_400_not_retryable() {
         r#"{"error": {"message": "bad request"}}"#,
     );
     match &err {
-        AttractorError::ProviderError { retryable, status, .. } => {
+        AttractorError::ProviderError {
+            retryable, status, ..
+        } => {
             assert!(!retryable);
             assert_eq!(*status, 400);
         }
@@ -193,7 +200,9 @@ fn error_mapping_500_retryable() {
         r#"{"error": {"message": "server error"}}"#,
     );
     match &err {
-        AttractorError::ProviderError { retryable, status, .. } => {
+        AttractorError::ProviderError {
+            retryable, status, ..
+        } => {
             assert!(*retryable);
             assert_eq!(*status, 500);
         }

@@ -57,7 +57,7 @@ pub fn run(graph: &PipelineGraph, workdir: &Path) -> Vec<PreflightFinding> {
         Ok(_) => {
             // Manifest found and valid — no warnings.
         }
-        Err(ResolutionError::NotFound { .. }) => {
+        Err(ResolutionError::NotFound) => {
             findings.push(PreflightFinding {
                 severity: Severity::Warn,
                 code: "QUALITY_NO_MANIFEST".into(),
@@ -73,11 +73,7 @@ pub fn run(graph: &PipelineGraph, workdir: &Path) -> Vec<PreflightFinding> {
             findings.push(PreflightFinding {
                 severity: Severity::Warn,
                 code: "QUALITY_MALFORMED_MANIFEST".into(),
-                message: format!(
-                    "pas.toml at {} is malformed: {}",
-                    path.display(),
-                    source
-                ),
+                message: format!("pas.toml at {} is malformed: {}", path.display(), source),
                 suggestion: None,
                 workdir: Some(workdir.to_path_buf()),
             });
@@ -250,7 +246,12 @@ mod tests {
         let graph = make_graph_with_quality_node();
         let findings = run(&graph, tmp.path());
 
-        assert_eq!(findings.len(), 1, "expected exactly 1 finding, got: {:?}", findings);
+        assert_eq!(
+            findings.len(),
+            1,
+            "expected exactly 1 finding, got: {:?}",
+            findings
+        );
         assert_eq!(findings[0].code, "QUALITY_NO_MANIFEST");
         assert_eq!(findings[0].severity, Severity::Warn);
         assert_eq!(findings[0].suggestion.as_deref(), Some("pas init"));

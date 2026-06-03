@@ -44,6 +44,12 @@ pub struct PipelineCheckpoint {
     /// Last failure_footprint seen for each quality node, keyed by node ID.
     #[serde(default)]
     pub quality_last_footprint: HashMap<String, String>,
+    /// Node that produced the edge into `current_node_id`.
+    ///
+    /// Persisted so quality loop keys (`quality_node::upstream_node`) survive
+    /// resume, even after `loop_restart` clears completed node history.
+    #[serde(default)]
+    pub previous_node_id: Option<String>,
 }
 
 impl PipelineCheckpoint {
@@ -66,6 +72,7 @@ impl PipelineCheckpoint {
             schema_version: 1,
             quality_loop_counters: HashMap::new(),
             quality_last_footprint: HashMap::new(),
+            previous_node_id: None,
         }
     }
 
@@ -91,11 +98,13 @@ impl PipelineCheckpoint {
             schema_version: 1,
             quality_loop_counters: HashMap::new(),
             quality_last_footprint: HashMap::new(),
+            previous_node_id: None,
         }
     }
 
     /// Create a checkpoint preserving quality loop counters (used by the engine
     /// when saving mid-loop state).
+    #[allow(clippy::too_many_arguments)]
     pub fn with_quality_counters(
         current_node_id: String,
         completed_nodes: Vec<String>,
@@ -105,6 +114,7 @@ impl PipelineCheckpoint {
         total_cost: f64,
         quality_loop_counters: HashMap<String, u32>,
         quality_last_footprint: HashMap<String, String>,
+        previous_node_id: Option<String>,
     ) -> Self {
         Self {
             current_node_id,
@@ -118,6 +128,7 @@ impl PipelineCheckpoint {
             schema_version: 1,
             quality_loop_counters,
             quality_last_footprint,
+            previous_node_id,
         }
     }
 }

@@ -22,10 +22,7 @@ pub enum AttractorError {
     AuthError { provider: String },
 
     #[error("Request to {provider} timed out after {timeout_ms}ms")]
-    RequestTimeout {
-        provider: String,
-        timeout_ms: u64,
-    },
+    RequestTimeout { provider: String, timeout_ms: u64 },
 
     #[error("Context length exceeded for {provider}: {message}")]
     ContextLengthExceeded { provider: String, message: String },
@@ -94,7 +91,10 @@ impl AttractorError {
             self,
             AttractorError::RateLimited { .. }
                 | AttractorError::CommandTimeout { .. }
-                | AttractorError::ProviderError { retryable: true, .. }
+                | AttractorError::ProviderError {
+                    retryable: true,
+                    ..
+                }
         )
     }
 
@@ -183,7 +183,10 @@ mod tests {
     #[test]
     fn error_display_validation() {
         let err = AttractorError::ValidationError("cycle detected".into());
-        assert_eq!(err.to_string(), "Pipeline validation failed: cycle detected");
+        assert_eq!(
+            err.to_string(),
+            "Pipeline validation failed: cycle detected"
+        );
     }
 
     #[test]

@@ -16,34 +16,113 @@ pub async fn validate_decomposition(
 
     // Common stdlib/language types whose ::method calls are noise, not spec identifiers
     let stdlib_prefixes: HashSet<&str> = [
-        "Arc", "Box", "Cell", "Cow", "HashMap", "HashSet", "Mutex", "Option",
-        "PathBuf", "Rc", "RefCell", "Result", "RwLock", "String", "Vec",
-        "AtomicBool", "AtomicU32", "AtomicU64", "AtomicUsize", "Ordering",
-        "BufReader", "BufWriter", "Duration", "Instant", "SystemTime",
-        "Command", "Path", "File", "Sender", "Receiver",
-        "JoinHandle", "TcpStream", "TcpListener",
-        "Bytes", "BytesMut", "Pin", "Waker",
-        "Some", "None", "Ok", "Err", "Default", "Display", "Debug",
-        "From", "Into", "TryFrom", "TryInto", "Iterator", "IntoIterator",
-        "Read", "Write", "Seek", "BufRead", "AsRef", "Deref",
-        "Serialize", "Deserialize", "Clone", "Copy", "Send", "Sync",
-        "PhantomData", "ManuallyDrop", "MaybeUninit",
+        "Arc",
+        "Box",
+        "Cell",
+        "Cow",
+        "HashMap",
+        "HashSet",
+        "Mutex",
+        "Option",
+        "PathBuf",
+        "Rc",
+        "RefCell",
+        "Result",
+        "RwLock",
+        "String",
+        "Vec",
+        "AtomicBool",
+        "AtomicU32",
+        "AtomicU64",
+        "AtomicUsize",
+        "Ordering",
+        "BufReader",
+        "BufWriter",
+        "Duration",
+        "Instant",
+        "SystemTime",
+        "Command",
+        "Path",
+        "File",
+        "Sender",
+        "Receiver",
+        "JoinHandle",
+        "TcpStream",
+        "TcpListener",
+        "Bytes",
+        "BytesMut",
+        "Pin",
+        "Waker",
+        "Some",
+        "None",
+        "Ok",
+        "Err",
+        "Default",
+        "Display",
+        "Debug",
+        "From",
+        "Into",
+        "TryFrom",
+        "TryInto",
+        "Iterator",
+        "IntoIterator",
+        "Read",
+        "Write",
+        "Seek",
+        "BufRead",
+        "AsRef",
+        "Deref",
+        "Serialize",
+        "Deserialize",
+        "Clone",
+        "Copy",
+        "Send",
+        "Sync",
+        "PhantomData",
+        "ManuallyDrop",
+        "MaybeUninit",
         // std::io and error types
-        "Error", "ErrorKind", "IoError",
+        "Error",
+        "ErrorKind",
+        "IoError",
         // tokio types
-        "Mutex", "RwLock", "Notify", "Semaphore", "Barrier",
-        "OwnedSemaphorePermit", "JoinSet", "JoinError",
+        "Mutex",
+        "RwLock",
+        "Notify",
+        "Semaphore",
+        "Barrier",
+        "OwnedSemaphorePermit",
+        "JoinSet",
+        "JoinError",
         // serde/common crate types
-        "Value", "Map", "Number", "Formatter",
+        "Value",
+        "Map",
+        "Number",
+        "Formatter",
         // test assertion types
-        "Assert", "Assertion",
-    ].into_iter().collect();
+        "Assert",
+        "Assertion",
+    ]
+    .into_iter()
+    .collect();
 
     // Generic trait method suffixes that aren't meaningful on any type
-    let noise_suffixes = ["::clone", "::into",
-        "::unwrap", "::expect", "::is_ok", "::is_err", "::is_some", "::is_none",
-        "::as_ref", "::as_str", "::as_bytes", "::as_slice",
-        "::to_string", "::to_owned", "::to_vec",
+    let noise_suffixes = [
+        "::clone",
+        "::into",
+        "::unwrap",
+        "::expect",
+        "::is_ok",
+        "::is_err",
+        "::is_some",
+        "::is_none",
+        "::as_ref",
+        "::as_str",
+        "::as_bytes",
+        "::as_slice",
+        "::to_string",
+        "::to_owned",
+        "::to_vec",
     ];
 
     let mut identifiers = HashSet::new();
@@ -78,7 +157,10 @@ pub async fn validate_decomposition(
         None => {
             println!("\nSpec validation (dry run):");
             if total > 0 {
-                println!("  Extracted {} identifiers to track coverage against tickets", total);
+                println!(
+                    "  Extracted {} identifiers to track coverage against tickets",
+                    total
+                );
                 let mut sorted: Vec<&str> = identifiers.iter().map(|s| s.as_str()).collect();
                 sorted.sort();
                 let display: Vec<&str> = sorted.iter().take(20).copied().collect();
@@ -133,11 +215,7 @@ pub async fn validate_decomposition(
         let title = ticket["title"].as_str().unwrap_or("?");
         let missing: Vec<&str> = check_fields
             .iter()
-            .filter(|&&field| {
-                ticket[field]
-                    .as_str()
-                    .is_none_or(|v| v.trim().is_empty())
-            })
+            .filter(|&&field| ticket[field].as_str().is_none_or(|v| v.trim().is_empty()))
             .copied()
             .collect();
 
@@ -167,7 +245,10 @@ pub async fn validate_decomposition(
     let mut covered = 0usize;
 
     for ident in &identifiers {
-        if ticket_texts.iter().any(|text| text.contains(ident.as_str())) {
+        if ticket_texts
+            .iter()
+            .any(|text| text.contains(ident.as_str()))
+        {
             covered += 1;
         } else {
             missing_ids.push(ident);

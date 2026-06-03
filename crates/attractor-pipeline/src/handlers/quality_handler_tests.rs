@@ -6,9 +6,9 @@ mod tests {
     use attractor_types::{Context, StageStatus};
 
     use crate::handler::default_registry;
+    use crate::handler::NodeHandler;
     use crate::handlers::quality_handler::QualityHandler;
     use crate::handlers::tests::{make_minimal_graph, make_node};
-    use crate::handler::NodeHandler;
 
     // -----------------------------------------------------------------------
     // Test 1: disabled via node attribute (enabled=false)
@@ -36,7 +36,8 @@ mod tests {
         let handler = QualityHandler;
         let node = make_node("verify", "box", None, HashMap::new());
         let ctx = Context::default();
-        ctx.set("quality_disabled", serde_json::Value::Bool(true)).await;
+        ctx.set("quality_disabled", serde_json::Value::Bool(true))
+            .await;
         let graph = make_minimal_graph();
 
         let outcome = handler.execute(&node, &ctx, &graph).await.unwrap();
@@ -97,7 +98,9 @@ mod tests {
             .context_updates
             .get("verify.results")
             .expect("verify.results should be in context_updates");
-        let arr = results.as_array().expect("verify.results should be a JSON array");
+        let arr = results
+            .as_array()
+            .expect("verify.results should be a JSON array");
         assert_eq!(arr.len(), 2, "Expected 2 result entries");
         for entry in arr {
             assert_eq!(
@@ -133,8 +136,14 @@ mod tests {
             .context_updates
             .get("verify.results")
             .expect("verify.results should be in context_updates");
-        let arr = results.as_array().expect("verify.results should be a JSON array");
-        assert_eq!(arr.len(), 1, "Only first command should have run (fail-fast)");
+        let arr = results
+            .as_array()
+            .expect("verify.results should be a JSON array");
+        assert_eq!(
+            arr.len(),
+            1,
+            "Only first command should have run (fail-fast)"
+        );
 
         // First entry should have passed=false
         assert_eq!(
@@ -303,7 +312,9 @@ cmd = "true"
         .await;
         let graph = make_minimal_graph();
 
+        std::env::set_var("PAS_TRUST_THIS", "1");
         let outcome = handler.execute(&node, &ctx, &graph).await.unwrap();
+        std::env::remove_var("PAS_TRUST_THIS");
         assert_eq!(outcome.status, StageStatus::Success);
 
         let results = outcome
@@ -312,12 +323,71 @@ cmd = "true"
             .and_then(|v| v.as_array())
             .expect("verify.results should be an array");
         assert_eq!(results.len(), 2, "both manifest stages should have run");
-        assert_eq!(results[0].get("stage").and_then(|v| v.as_str()), Some("check-a"));
-        assert_eq!(results[1].get("stage").and_then(|v| v.as_str()), Some("check-b"));
+        assert_eq!(
+            results[0].get("stage").and_then(|v| v.as_str()),
+            Some("check-a")
+        );
+        assert_eq!(
+            results[1].get("stage").and_then(|v| v.as_str()),
+            Some("check-b")
+        );
     }
 
     // -----------------------------------------------------------------------
-    // Test 11 (integration): 2-node pass+fail outcomes
+    // Test 11: empty manifest stages fall back to legacy quality_checks
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn quality_handler_empty_manifest_stages_fall_back_to_attr() {
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        let tmp = TempDir::new().unwrap();
+        let manifest = r#"
+[project]
+name = "test-project"
+
+[quality]
+stages = []
+"#;
+        let toml_path = tmp.path().join("pas.toml");
+        std::fs::File::create(&toml_path)
+            .unwrap()
+            .write_all(manifest.as_bytes())
+            .unwrap();
+        std::fs::create_dir_all(tmp.path().join(".git")).unwrap();
+
+        let handler = QualityHandler;
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "quality_checks".into(),
+            AttributeValue::String("true".into()),
+        );
+        let node = make_node("verify", "box", None, attrs);
+        let ctx = Context::default();
+        ctx.set(
+            "workdir",
+            serde_json::Value::String(tmp.path().to_string_lossy().to_string()),
+        )
+        .await;
+        let graph = make_minimal_graph();
+
+        let outcome = handler.execute(&node, &ctx, &graph).await.unwrap();
+        assert_eq!(outcome.status, StageStatus::Success);
+        let results = outcome
+            .context_updates
+            .get("verify.results")
+            .and_then(|v| v.as_array())
+            .expect("verify.results should be an array");
+        assert_eq!(results.len(), 1);
+        assert_eq!(
+            results[0].get("stage").and_then(|v| v.as_str()),
+            Some("true")
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 12 (integration): 2-node pass+fail outcomes
     // -----------------------------------------------------------------------
 
     #[tokio::test]

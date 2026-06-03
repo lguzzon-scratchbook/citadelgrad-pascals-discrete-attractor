@@ -45,11 +45,7 @@ impl OpenAiAdapter {
 
     fn build_request_body(&self, request: &Request) -> serde_json::Value {
         // 1. Convert messages to input array
-        let input: Vec<serde_json::Value> = request
-            .messages
-            .iter()
-            .map(convert_message)
-            .collect();
+        let input: Vec<serde_json::Value> = request.messages.iter().map(convert_message).collect();
 
         // 2. Build body
         let mut body = json!({
@@ -218,7 +214,10 @@ fn convert_message(msg: &Message) -> serde_json::Value {
 
     // For assistant messages with tool calls, we need special handling
     if msg.role == Role::Assistant {
-        let has_tool_calls = msg.content.iter().any(|p| matches!(p, ContentPart::ToolCall { .. }));
+        let has_tool_calls = msg
+            .content
+            .iter()
+            .any(|p| matches!(p, ContentPart::ToolCall { .. }));
         if has_tool_calls {
             let mut text_parts = Vec::new();
             let mut tool_call_parts = Vec::new();
@@ -348,12 +347,15 @@ impl ProviderAdapter for OpenAiAdapter {
             })?;
 
         let status = resp.status();
-        let response_body = resp.text().await.map_err(|e| AttractorError::ProviderError {
-            provider: "openai".into(),
-            status: 0,
-            message: e.to_string(),
-            retryable: true,
-        })?;
+        let response_body = resp
+            .text()
+            .await
+            .map_err(|e| AttractorError::ProviderError {
+                provider: "openai".into(),
+                status: 0,
+                message: e.to_string(),
+                retryable: true,
+            })?;
 
         if !status.is_success() {
             return Err(map_error(status, &response_body));
@@ -370,10 +372,7 @@ impl ProviderAdapter for OpenAiAdapter {
         self.parse_response(json)
     }
 
-    fn stream(
-        &self,
-        _request: &Request,
-    ) -> Pin<Box<dyn Stream<Item = StreamEvent> + Send + '_>> {
+    fn stream(&self, _request: &Request) -> Pin<Box<dyn Stream<Item = StreamEvent> + Send + '_>> {
         Box::pin(tokio_stream::empty::<StreamEvent>())
     }
 

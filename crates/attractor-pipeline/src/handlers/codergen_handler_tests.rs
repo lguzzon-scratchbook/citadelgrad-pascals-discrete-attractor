@@ -9,26 +9,47 @@ use crate::handlers::tests::{make_minimal_graph, make_node};
 
 #[test]
 fn provider_from_str_claude_variants() {
-    assert_eq!("claude".parse::<LlmCliProvider>(), Ok(LlmCliProvider::Claude));
-    assert_eq!("anthropic".parse::<LlmCliProvider>(), Ok(LlmCliProvider::Claude));
-    assert_eq!("CLAUDE".parse::<LlmCliProvider>(), Ok(LlmCliProvider::Claude));
+    assert_eq!(
+        "claude".parse::<LlmCliProvider>(),
+        Ok(LlmCliProvider::Claude)
+    );
+    assert_eq!(
+        "anthropic".parse::<LlmCliProvider>(),
+        Ok(LlmCliProvider::Claude)
+    );
+    assert_eq!(
+        "CLAUDE".parse::<LlmCliProvider>(),
+        Ok(LlmCliProvider::Claude)
+    );
 }
 
 #[test]
 fn provider_from_str_codex_variants() {
     assert_eq!("codex".parse::<LlmCliProvider>(), Ok(LlmCliProvider::Codex));
-    assert_eq!("openai".parse::<LlmCliProvider>(), Ok(LlmCliProvider::Codex));
+    assert_eq!(
+        "openai".parse::<LlmCliProvider>(),
+        Ok(LlmCliProvider::Codex)
+    );
 }
 
 #[test]
 fn provider_from_str_gemini_variants() {
-    assert_eq!("gemini".parse::<LlmCliProvider>(), Ok(LlmCliProvider::Gemini));
-    assert_eq!("google".parse::<LlmCliProvider>(), Ok(LlmCliProvider::Gemini));
+    assert_eq!(
+        "gemini".parse::<LlmCliProvider>(),
+        Ok(LlmCliProvider::Gemini)
+    );
+    assert_eq!(
+        "google".parse::<LlmCliProvider>(),
+        Ok(LlmCliProvider::Gemini)
+    );
 }
 
 #[test]
 fn provider_from_str_unknown_defaults_to_claude() {
-    assert_eq!("llama".parse::<LlmCliProvider>(), Ok(LlmCliProvider::Claude));
+    assert_eq!(
+        "llama".parse::<LlmCliProvider>(),
+        Ok(LlmCliProvider::Claude)
+    );
 }
 
 #[test]
@@ -146,7 +167,10 @@ fn parse_gemini_output_invalid_json() {
 fn parse_cli_output_empty_stdout_errors() {
     let result = parse_cli_output(LlmCliProvider::Claude, "", "some error", "n");
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("produced no output"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("produced no output"));
 }
 
 // --- build_cli_command ---
@@ -164,7 +188,11 @@ fn build_cli_command_claude_has_json_output() {
         graph: &graph,
     };
     let cmd = build_cli_command(&cfg);
-    let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_str().unwrap()).collect();
+    let args: Vec<_> = cmd
+        .as_std()
+        .get_args()
+        .map(|a| a.to_str().unwrap())
+        .collect();
     assert!(args.contains(&"--output-format"));
     assert!(args.contains(&"json"));
     assert!(args.contains(&"--model"));
@@ -185,7 +213,11 @@ fn build_cli_command_codex_prompt_is_positional() {
         graph: &graph,
     };
     let cmd = build_cli_command(&cfg);
-    let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_str().unwrap()).collect();
+    let args: Vec<_> = cmd
+        .as_std()
+        .get_args()
+        .map(|a| a.to_str().unwrap())
+        .collect();
     assert!(args.contains(&"--json"));
     assert!(args.contains(&"--yolo"));
     // Prompt should be last (positional)
@@ -207,7 +239,11 @@ fn build_cli_command_gemini_uses_approval_mode() {
         graph: &graph,
     };
     let cmd = build_cli_command(&cfg);
-    let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_str().unwrap()).collect();
+    let args: Vec<_> = cmd
+        .as_std()
+        .get_args()
+        .map(|a| a.to_str().unwrap())
+        .collect();
     assert!(args.contains(&"--approval-mode"));
     assert!(args.contains(&"yolo"));
     assert!(args.contains(&"--model"));

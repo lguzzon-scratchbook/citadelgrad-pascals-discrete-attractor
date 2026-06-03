@@ -36,7 +36,20 @@ fn trust_store_path() -> PathBuf {
 }
 
 fn make_key(path: &Path, blake3: &str) -> String {
-    format!("{}\0{}", path.display(), blake3)
+    let normalized = normalize_path(path);
+    format!("{}\0{}", normalized.display(), blake3)
+}
+
+fn normalize_path(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| {
+        if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            std::env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join(path)
+        }
+    })
 }
 
 fn load_store() -> Result<TrustStore, TrustError> {
@@ -44,16 +57,15 @@ fn load_store() -> Result<TrustStore, TrustError> {
     if !p.exists() {
         return Ok(TrustStore::default());
     }
-    let content = std::fs::read_to_string(&p)
-        .map_err(|e| TrustError::CorruptedStore(e.to_string()))?;
+    let content =
+        std::fs::read_to_string(&p).map_err(|e| TrustError::CorruptedStore(e.to_string()))?;
     serde_json::from_str(&content).map_err(|e| TrustError::CorruptedStore(e.to_string()))
 }
 
 fn save_store(store: &TrustStore) -> Result<(), TrustError> {
     let p = trust_store_path();
     if let Some(parent) = p.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|e| TrustError::CorruptedStore(e.to_string()))?;
+        std::fs::create_dir_all(parent).map_err(|e| TrustError::CorruptedStore(e.to_string()))?;
     }
     let content = serde_json::to_string_pretty(store)
         .map_err(|e| TrustError::CorruptedStore(e.to_string()))?;
@@ -65,8 +77,7 @@ fn save_store(store: &TrustStore) -> Result<(), TrustError> {
         .tempfile_in(dir)
         .map_err(|e| TrustError::CorruptedStore(e.to_string()))?;
 
-    std::fs::write(tmp.path(), &content)
-        .map_err(|e| TrustError::CorruptedStore(e.to_string()))?;
+    std::fs::write(tmp.path(), &content).map_err(|e| TrustError::CorruptedStore(e.to_string()))?;
 
     #[cfg(unix)]
     {
@@ -90,14 +101,6 @@ pub fn is_trusted(path: &Path, blake3: &str) -> bool {
         );
         return true;
     }
-    if std::env::var("PAS_AGENT").as_deref() == Ok("1") {
-        tracing::warn!(
-            path = %path.display(),
-            hash = %&blake3[..blake3.len().min(16)],
-            "Trust check bypassed via PAS_AGENT — manifest is treated as trusted without verification"
-        );
-        return true;
-    }
     let store = match load_store() {
         Ok(s) => s,
         Err(e) => {
@@ -109,11 +112,12 @@ pub fn is_trusted(path: &Path, blake3: &str) -> bool {
 }
 
 pub fn add_trust(path: &Path, blake3: &str, source: &str) -> Result<(), TrustError> {
+    let normalized = normalize_path(path);
     let mut store = load_store()?;
     store.entries.insert(
-        make_key(path, blake3),
+        make_key(&normalized, blake3),
         TrustEntry {
-            path: path.to_string_lossy().to_string(),
+            path: normalized.to_string_lossy().to_string(),
             blake3_hash: blake3.to_string(),
             source: source.to_string(),
             added_at: chrono::Utc::now().to_rfc3339(),
@@ -185,11 +189,42 @@ mod tests {
     }
 
     #[test]
+    fn trust_matches_relative_and_canonical_paths() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let tmp = TempDir::new().unwrap();
+        std::env::set_var("XDG_CONFIG_HOME", tmp.path().join("config"));
+        let manifest = tmp.path().join("pas.toml");
+        std::fs::write(&manifest, "[project]\nname = \"x\"\n").unwrap();
+        let old_cwd = std::env::current_dir().unwrap();
+        std::env::set_current_dir(tmp.path()).unwrap();
+
+        let hash = "abc123def456789";
+        add_trust(Path::new("pas.toml"), hash, "test").unwrap();
+        assert!(is_trusted(&manifest, hash));
+
+        std::env::set_current_dir(old_cwd).unwrap();
+        std::env::remove_var("XDG_CONFIG_HOME");
+    }
+
+    #[test]
     fn pas_trust_this_env_bypasses_check() {
         let _guard = TEST_LOCK.lock().unwrap();
         std::env::set_var("PAS_TRUST_THIS", "1");
         assert!(is_trusted(Path::new("/any/path"), "any_hash"));
         std::env::remove_var("PAS_TRUST_THIS");
+    }
+
+    #[test]
+    fn pas_agent_does_not_bypass_trust_check() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        let tmp = TempDir::new().unwrap();
+        std::env::set_var("XDG_CONFIG_HOME", tmp.path());
+        std::env::set_var("PAS_AGENT", "1");
+
+        assert!(!is_trusted(Path::new("/any/path"), "any_hash"));
+
+        std::env::remove_var("PAS_AGENT");
+        std::env::remove_var("XDG_CONFIG_HOME");
     }
 
     #[test]

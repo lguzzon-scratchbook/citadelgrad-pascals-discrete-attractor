@@ -1,8 +1,8 @@
 use super::*;
+use crate::test_utils::{make_client, EchoTool, MockEnv, SequenceMockProvider};
 use async_trait::async_trait;
 use attractor_llm::{FinishReason, Response, Usage};
 use attractor_tools::{Tool, ToolDefinition as ToolsToolDef};
-use crate::test_utils::{make_client, EchoTool, MockEnv, SequenceMockProvider};
 
 // -----------------------------------------------------------------------
 // Test 1: Session creation with config
@@ -101,8 +101,12 @@ async fn process_input_with_tool_call() {
         &session.history()[1],
         Turn::Assistant { tool_calls, .. } if tool_calls.len() == 1
     ));
-    assert!(matches!(&session.history()[2], Turn::ToolResults { results } if results.len() == 1 && !results[0].is_error && results[0].content == "ping"));
-    assert!(matches!(&session.history()[3], Turn::Assistant { content, .. } if content == "The echo returned: ping"));
+    assert!(
+        matches!(&session.history()[2], Turn::ToolResults { results } if results.len() == 1 && !results[0].is_error && results[0].content == "ping")
+    );
+    assert!(
+        matches!(&session.history()[3], Turn::Assistant { content, .. } if content == "The echo returned: ping")
+    );
 }
 
 // -----------------------------------------------------------------------

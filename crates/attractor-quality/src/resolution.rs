@@ -1,13 +1,16 @@
+use crate::manifest::{Manifest, ResolvedManifest};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
-use crate::manifest::{Manifest, ResolvedManifest};
 
 #[derive(Debug, Error)]
 pub enum ResolutionError {
     #[error("pas.toml not found (searched up to 16 directory levels)")]
     NotFound,
     #[error("pas.toml at {path} is malformed: {source}")]
-    Malformed { path: PathBuf, source: toml::de::Error },
+    Malformed {
+        path: PathBuf,
+        source: toml::de::Error,
+    },
     #[error("pas.toml at {path} is invalid: {reason}")]
     Invalid { path: PathBuf, reason: String },
 }
@@ -19,18 +22,22 @@ pub fn resolve(start_dir: &Path) -> Result<ResolvedManifest, ResolutionError> {
     loop {
         let candidate = current.join("pas.toml");
         if candidate.exists() {
-            let content = std::fs::read_to_string(&candidate)
-                .map_err(|e| ResolutionError::Invalid {
+            let content =
+                std::fs::read_to_string(&candidate).map_err(|e| ResolutionError::Invalid {
                     path: candidate.clone(),
                     reason: e.to_string(),
                 })?;
-            let manifest: Manifest = toml::from_str(&content)
-                .map_err(|e| ResolutionError::Malformed {
+            let manifest: Manifest =
+                toml::from_str(&content).map_err(|e| ResolutionError::Malformed {
                     path: candidate.clone(),
                     source: e,
                 })?;
             let blake3_hash = blake3::hash(content.as_bytes()).to_hex().to_string();
-            return Ok(ResolvedManifest { manifest, path: candidate, blake3_hash });
+            return Ok(ResolvedManifest {
+                manifest,
+                path: candidate,
+                blake3_hash,
+            });
         }
 
         // Stop if .git directory found (workspace root)
@@ -59,13 +66,17 @@ mod tests {
     use tempfile::TempDir;
 
     fn write_valid_manifest(dir: &Path) {
-        fs::write(dir.join("pas.toml"), r#"
+        fs::write(
+            dir.join("pas.toml"),
+            r#"
 [project]
 name = "test-project"
 
 [quality]
 stages = ["lint", "test"]
-"#).unwrap();
+"#,
+        )
+        .unwrap();
     }
 
     #[test]

@@ -27,8 +27,7 @@ pub async fn init_db() -> Result<SqlitePool, sqlx::Error> {
     let pas_dir = PathBuf::from(home_dir).join(".pas");
 
     // Create directory if it doesn't exist
-    std::fs::create_dir_all(&pas_dir)
-        .map_err(sqlx::Error::Io)?;
+    std::fs::create_dir_all(&pas_dir).map_err(sqlx::Error::Io)?;
 
     let db_path = pas_dir.join("web.db");
     let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
@@ -76,10 +75,7 @@ pub async fn init_db() -> Result<SqlitePool, sqlx::Error> {
 ///
 /// If the project doesn't exist, it's created with the folder basename as the name.
 /// If it exists, `is_open` is set to 1 and `last_used` is updated.
-pub async fn upsert_project(
-    pool: &SqlitePool,
-    folder_path: &str,
-) -> Result<Project, sqlx::Error> {
+pub async fn upsert_project(pool: &SqlitePool, folder_path: &str) -> Result<Project, sqlx::Error> {
     // Extract project name from folder path
     let name = PathBuf::from(folder_path)
         .file_name()

@@ -130,8 +130,13 @@ pub async fn cmd_decompose(spec_path: &std::path::Path, dry_run: bool) -> anyhow
     // Strip markdown code fences if present (handles ```json, ```, etc.)
     let cleaned = strip_code_fences(result_str);
 
-    let decompose: DecomposeOutput = serde_json::from_str(&cleaned)
-        .map_err(|e| anyhow::anyhow!("Failed to parse Claude's JSON output: {}\n\nRaw output:\n{}", e, cleaned))?;
+    let decompose: DecomposeOutput = serde_json::from_str(&cleaned).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to parse Claude's JSON output: {}\n\nRaw output:\n{}",
+            e,
+            cleaned
+        )
+    })?;
 
     if dry_run {
         println!("Decomposition (dry run):\n");
@@ -139,8 +144,14 @@ pub async fn cmd_decompose(spec_path: &std::path::Path, dry_run: bool) -> anyhow
         println!("  Description: {}", decompose.epic.description);
         println!("\nTasks ({}):", decompose.tasks.len());
         for (i, task) in decompose.tasks.iter().enumerate() {
-            println!("  [{}] {} (type={}, priority={})", i, task.title, task.r#type, task.priority);
-            println!("      Description: {}", truncate_for_display(&task.description, 120));
+            println!(
+                "  [{}] {} (type={}, priority={})",
+                i, task.title, task.r#type, task.priority
+            );
+            println!(
+                "      Description: {}",
+                truncate_for_display(&task.description, 120)
+            );
             if let Some(ref a) = task.acceptance {
                 println!("      Acceptance: {}", truncate_for_display(a, 120));
             }
@@ -161,8 +172,16 @@ pub async fn cmd_decompose(spec_path: &std::path::Path, dry_run: bool) -> anyhow
 
     // Create the epic
     let epic_output = tokio::process::Command::new("bd")
-        .args(["create", "--title", &decompose.epic.title, "--type", "epic",
-               "--description", &decompose.epic.description, "--silent"])
+        .args([
+            "create",
+            "--title",
+            &decompose.epic.title,
+            "--type",
+            "epic",
+            "--description",
+            &decompose.epic.description,
+            "--silent",
+        ])
         .output()
         .await?;
 
@@ -179,10 +198,14 @@ pub async fn cmd_decompose(spec_path: &std::path::Path, dry_run: bool) -> anyhow
     for task in &decompose.tasks {
         let mut args = vec![
             "create".to_string(),
-            "--title".to_string(), task.title.clone(),
-            "--type".to_string(), task.r#type.clone(),
-            "--priority".to_string(), task.priority.clone(),
-            "--description".to_string(), task.description.clone(),
+            "--title".to_string(),
+            task.title.clone(),
+            "--type".to_string(),
+            task.r#type.clone(),
+            "--priority".to_string(),
+            task.priority.clone(),
+            "--description".to_string(),
+            task.description.clone(),
         ];
 
         if let Some(ref acceptance) = task.acceptance {
@@ -222,7 +245,10 @@ pub async fn cmd_decompose(spec_path: &std::path::Path, dry_run: bool) -> anyhow
 
         if !dep_output.status.success() {
             let stderr = String::from_utf8_lossy(&dep_output.stderr);
-            eprintln!("Warning: failed to add epic dependency for {}: {}", task_id, stderr);
+            eprintln!(
+                "Warning: failed to add epic dependency for {}: {}",
+                task_id, stderr
+            );
         }
     }
 
@@ -237,14 +263,20 @@ pub async fn cmd_decompose(spec_path: &std::path::Path, dry_run: bool) -> anyhow
 
             if !dep_output.status.success() {
                 let stderr = String::from_utf8_lossy(&dep_output.stderr);
-                eprintln!("Warning: failed to add dependency [{} -> {}]: {}",
-                    task_ids[dep.blocked], task_ids[dep.blocker], stderr);
+                eprintln!(
+                    "Warning: failed to add dependency [{} -> {}]: {}",
+                    task_ids[dep.blocked], task_ids[dep.blocker], stderr
+                );
             } else {
                 dep_count += 1;
             }
         } else {
-            eprintln!("Warning: dependency index out of range (blocked={}, blocker={}, tasks={})",
-                dep.blocked, dep.blocker, task_ids.len());
+            eprintln!(
+                "Warning: dependency index out of range (blocked={}, blocker={}, tasks={})",
+                dep.blocked,
+                dep.blocker,
+                task_ids.len()
+            );
         }
     }
 

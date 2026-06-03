@@ -103,7 +103,10 @@ fn build_prompt_prd_before_spec() {
     let result = build_prompt("SPEC_CONTENT", Some("PRD_CONTENT"));
     let prd_pos = result.find("PRD_CONTENT").unwrap();
     let spec_pos = result.find("SPEC_CONTENT").unwrap();
-    assert!(prd_pos < spec_pos, "PRD should appear before spec in prompt");
+    assert!(
+        prd_pos < spec_pos,
+        "PRD should appear before spec in prompt"
+    );
 }
 
 // ── extract_digraph ────────────────────────────────────────────

@@ -102,7 +102,10 @@ async fn edge_selection_respects_condition_over_weight() {
         }"#,
     );
 
-    let result = executor().run(&graph).await.expect("pipeline should succeed");
+    let result = executor()
+        .run(&graph)
+        .await
+        .expect("pipeline should succeed");
 
     assert!(
         result.completed_nodes.contains(&"low_weight".to_string()),
@@ -158,7 +161,10 @@ async fn goal_gate_unsatisfied_without_retry_returns_error() {
     let exec = PipelineExecutor::new(registry);
     let result = exec.run(&graph).await;
 
-    assert!(result.is_err(), "pipeline should fail with unsatisfied goal gate");
+    assert!(
+        result.is_err(),
+        "pipeline should fail with unsatisfied goal gate"
+    );
     let err = result.unwrap_err();
     let err_msg = err.to_string();
     assert!(
@@ -194,10 +200,7 @@ async fn goal_gate_with_retry_target_retries_then_succeeds() {
                 Ok(Outcome::fail("first attempt fails"))
             } else {
                 let mut updates = HashMap::new();
-                updates.insert(
-                    format!("{}.completed", node.id),
-                    serde_json::json!(true),
-                );
+                updates.insert(format!("{}.completed", node.id), serde_json::json!(true));
                 Ok(Outcome {
                     status: StageStatus::Success,
                     preferred_label: None,
@@ -229,7 +232,10 @@ async fn goal_gate_with_retry_target_retries_then_succeeds() {
     });
 
     let exec = PipelineExecutor::new(registry);
-    let result = exec.run(&graph).await.expect("pipeline should succeed after retry");
+    let result = exec
+        .run(&graph)
+        .await
+        .expect("pipeline should succeed after retry");
 
     // The handler was called at least twice (once fail, once success)
     assert!(
@@ -331,7 +337,10 @@ async fn edge_weight_tiebreaker_selects_highest_weight() {
         }"#,
     );
 
-    let result = executor().run(&graph).await.expect("pipeline should succeed");
+    let result = executor()
+        .run(&graph)
+        .await
+        .expect("pipeline should succeed");
 
     assert!(
         result.completed_nodes.contains(&"high".to_string()),
@@ -362,7 +371,10 @@ async fn graph_goal_attribute_propagates_to_context() {
 
     assert_eq!(graph.goal, "Build a working pipeline");
 
-    let result = executor().run(&graph).await.expect("pipeline should succeed");
+    let result = executor()
+        .run(&graph)
+        .await
+        .expect("pipeline should succeed");
 
     // Graph attrs are loaded into context during initialization
     assert_eq!(
@@ -406,14 +418,15 @@ async fn condition_routes_to_fallback_on_no_match() {
         }"#,
     );
 
-    let result = executor().run(&graph).await.expect("pipeline should succeed");
+    let result = executor()
+        .run(&graph)
+        .await
+        .expect("pipeline should succeed");
 
     // Conditional handler returns Success, so outcome=success, which does NOT match
     // the condition "outcome=fail". The unconditional edge to default_path should be taken.
     assert!(
-        result
-            .completed_nodes
-            .contains(&"default_path".to_string()),
+        result.completed_nodes.contains(&"default_path".to_string()),
         "default_path should be taken when condition does not match; completed: {:?}",
         result.completed_nodes
     );
@@ -499,15 +512,10 @@ async fn quality_loop_aborts_at_max_fix_iterations() {
     )
     .await;
     // max_fix_iterations=1 → the verify::fix counter aborts at iteration 2
-    ctx.set(
-        "quality_max_fix_iterations",
-        serde_json::json!(1u64),
-    )
-    .await;
-
-    let result = executor_with_quality()
-        .run_with_context(&graph, ctx)
+    ctx.set("quality_max_fix_iterations", serde_json::json!(1u64))
         .await;
+
+    let result = executor_with_quality().run_with_context(&graph, ctx).await;
 
     assert!(
         result.is_err(),
@@ -547,14 +555,16 @@ async fn quality_loop_long() {
         serde_json::Value::String(tmp.path().to_string_lossy().to_string()),
     )
     .await;
-    ctx.set("quality_max_fix_iterations", serde_json::json!(3u64)).await;
-
-    let result = executor_with_quality()
-        .run_with_context(&graph, ctx)
+    ctx.set("quality_max_fix_iterations", serde_json::json!(3u64))
         .await;
+
+    let result = executor_with_quality().run_with_context(&graph, ctx).await;
 
     // Always-failing quality_checks → should still exhaust and abort
     assert!(result.is_err(), "long loop should exhaust and abort");
     let err = result.unwrap_err().to_string();
-    assert!(err.contains("max_fix_iterations"), "error should name the limit; got: {err}");
+    assert!(
+        err.contains("max_fix_iterations"),
+        "error should name the limit; got: {err}"
+    );
 }

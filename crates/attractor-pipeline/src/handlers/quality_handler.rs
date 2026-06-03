@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use async_trait::async_trait;
@@ -75,15 +75,14 @@ impl NodeHandler for QualityHandler {
             .get("workdir")
             .await
             .and_then(|v| v.as_str().map(PathBuf::from))
-            .unwrap_or_else(|| {
-                std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-            });
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
         // Primary: manifest-driven stages; fallback: quality_checks attribute
         let stages: Vec<StageSpec> = match attractor_quality::resolve(&workdir) {
             Ok(resolved) => {
                 if let Some(quality) = &resolved.manifest.quality {
                     if !quality.stages.is_empty() {
+                        ensure_manifest_trusted(&resolved.path, &resolved.blake3_hash, node_id)?;
                         quality
                             .stages
                             .iter()
@@ -112,9 +111,7 @@ impl NodeHandler for QualityHandler {
             }
         };
 
-        let default_timeout = node
-            .timeout
-            .unwrap_or(std::time::Duration::from_secs(600));
+        let default_timeout = node.timeout.unwrap_or(std::time::Duration::from_secs(600));
 
         let mut results: Vec<serde_json::Value> = Vec::new();
         let mut all_passed = true;
@@ -166,27 +163,26 @@ impl NodeHandler for QualityHandler {
             #[cfg(unix)]
             let child_pid = child.id();
 
-            let output =
-                match tokio::time::timeout(stage_timeout, child.wait_with_output()).await {
-                    Ok(Ok(o)) => o,
-                    Ok(Err(e)) => {
-                        return Err(AttractorError::HandlerError {
-                            handler: "quality".into(),
-                            node: node_id.clone(),
-                            message: format!("stage '{}' I/O error: {e}", stage.name),
-                        })
+            let output = match tokio::time::timeout(stage_timeout, child.wait_with_output()).await {
+                Ok(Ok(o)) => o,
+                Ok(Err(e)) => {
+                    return Err(AttractorError::HandlerError {
+                        handler: "quality".into(),
+                        node: node_id.clone(),
+                        message: format!("stage '{}' I/O error: {e}", stage.name),
+                    })
+                }
+                Err(_) => {
+                    // Kill the process group, then let kill_on_drop clean up the child.
+                    #[cfg(unix)]
+                    if let Some(pid) = child_pid {
+                        unsafe { libc::killpg(pid as libc::pid_t, libc::SIGKILL) };
                     }
-                    Err(_) => {
-                        // Kill the process group, then let kill_on_drop clean up the child.
-                        #[cfg(unix)]
-                        if let Some(pid) = child_pid {
-                            unsafe { libc::killpg(pid as libc::pid_t, libc::SIGKILL) };
-                        }
-                        return Err(AttractorError::CommandTimeout {
-                            timeout_ms: stage_timeout.as_millis() as u64,
-                        });
-                    }
-                };
+                    return Err(AttractorError::CommandTimeout {
+                        timeout_ms: stage_timeout.as_millis() as u64,
+                    });
+                }
+            };
 
             let duration_ms = start.elapsed().as_millis() as u64;
             let exit_code = output.status.code().unwrap_or(-1);
@@ -201,16 +197,19 @@ impl NodeHandler for QualityHandler {
                 &output.stderr
             };
             let stderr_raw = String::from_utf8_lossy(stderr_bytes);
-            let stderr_display = truncate_head_tail(&stderr_raw, HEAD_LINES, TAIL_LINES);
+            let stderr_clean = strip_ansi_escapes(&stderr_raw);
+            let stderr_display = truncate_head_tail(&stderr_clean, HEAD_LINES, TAIL_LINES);
 
-            // failure_footprint = blake3(stage_name || first_2KB(stderr))[..16]
+            // failure_footprint = blake3(stage_name || "|" || first_2KB(stderr_without_ansi))[..16]
             let failure_footprint = if !stage_ok {
-                // Find a safe UTF-8 char boundary at or before 2048 bytes to avoid
-                // panicking when from_utf8_lossy inserted 3-byte replacement chars.
-                let max = stderr_raw.len().min(2048);
-                let safe_end = (0..=max).rev().find(|&i| stderr_raw.is_char_boundary(i)).unwrap_or(0);
-                let slice = &stderr_raw[..safe_end];
-                let input = format!("{}{}", stage.name, slice);
+                // Find a safe UTF-8 char boundary at or before 2048 bytes.
+                let max = stderr_clean.len().min(2048);
+                let safe_end = (0..=max)
+                    .rev()
+                    .find(|&i| stderr_clean.is_char_boundary(i))
+                    .unwrap_or(0);
+                let slice = &stderr_clean[..safe_end];
+                let input = format!("{}|{}", stage.name, slice);
                 let hash = blake3::hash(input.as_bytes());
                 Some(hash.to_hex()[..16].to_string())
             } else {
@@ -296,6 +295,57 @@ fn skip_outcome(notes: &str) -> Outcome {
         notes: notes.into(),
         failure_reason: None,
     }
+}
+
+fn ensure_manifest_trusted(path: &Path, blake3_hash: &str, node_id: &str) -> Result<()> {
+    if attractor_quality::is_trusted(path, blake3_hash) {
+        return Ok(());
+    }
+
+    match attractor_quality::prompt_and_add(path, blake3_hash) {
+        Ok(true) => Ok(()),
+        Ok(false) => Err(AttractorError::HandlerError {
+            handler: "quality".into(),
+            node: node_id.to_string(),
+            message: format!(
+                "pas.toml at {} is not trusted; run `pas trust add {} {}` or set PAS_TRUST_THIS=1",
+                path.display(),
+                path.display(),
+                blake3_hash
+            ),
+        }),
+        Err(e) => Err(AttractorError::HandlerError {
+            handler: "quality".into(),
+            node: node_id.to_string(),
+            message: format!("failed to check pas.toml trust: {e}"),
+        }),
+    }
+}
+
+fn strip_ansi_escapes(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch != '\u{1b}' {
+            out.push(ch);
+            continue;
+        }
+
+        match chars.peek().copied() {
+            Some('[') => {
+                chars.next();
+                for c in chars.by_ref() {
+                    if ('@'..='~').contains(&c) {
+                        break;
+                    }
+                }
+            }
+            _ => out.push(ch),
+        }
+    }
+
+    out
 }
 
 /// Resolve argv for a manifest stage: prefer cmd_argv, then shlex-split cmd,

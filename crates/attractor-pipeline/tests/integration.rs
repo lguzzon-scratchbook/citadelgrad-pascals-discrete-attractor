@@ -98,10 +98,16 @@ async fn simple_linear_pipeline_completes_in_order() {
         .iter()
         .filter(|d| d.severity == attractor_pipeline::Severity::Error)
         .collect();
-    assert!(errors.is_empty(), "Expected no validation errors: {errors:?}");
+    assert!(
+        errors.is_empty(),
+        "Expected no validation errors: {errors:?}"
+    );
 
     // Execute
-    let result = executor().run(&graph).await.expect("pipeline should succeed");
+    let result = executor()
+        .run(&graph)
+        .await
+        .expect("pipeline should succeed");
 
     // All 3 nodes should complete in order
     assert_eq!(
@@ -145,7 +151,10 @@ async fn branching_pipeline_routes_via_condition() {
         }"#,
     );
 
-    let result = executor().run(&graph).await.expect("pipeline should succeed");
+    let result = executor()
+        .run(&graph)
+        .await
+        .expect("pipeline should succeed");
 
     // The conditional handler returns Success, so outcome=success.
     // The edge to path_a has condition="outcome=success" which should match.
@@ -181,7 +190,10 @@ async fn goal_gate_satisfied_pipeline_completes() {
     );
 
     // The default codergen handler returns Success, satisfying the goal gate.
-    let result = executor().run(&graph).await.expect("pipeline should succeed");
+    let result = executor()
+        .run(&graph)
+        .await
+        .expect("pipeline should succeed");
 
     assert!(
         result.completed_nodes.contains(&"review".to_string()),
@@ -214,7 +226,10 @@ async fn validation_catches_missing_start_node() {
 
     // validate_or_raise should return an error
     let result = validate_or_raise(&graph);
-    assert!(result.is_err(), "validation should fail without a start node");
+    assert!(
+        result.is_err(),
+        "validation should fail without a start node"
+    );
 
     let err_msg = result.unwrap_err().to_string();
     assert!(
@@ -225,8 +240,9 @@ async fn validation_catches_missing_start_node() {
     // Also verify the advisory validate() produces an Error-level diagnostic
     let diags = validate(&graph);
     assert!(
-        diags.iter().any(|d| d.rule == "start_node"
-            && d.severity == attractor_pipeline::Severity::Error),
+        diags
+            .iter()
+            .any(|d| d.rule == "start_node" && d.severity == attractor_pipeline::Severity::Error),
         "Expected start_node error diagnostic; got: {diags:?}"
     );
 }
@@ -313,7 +329,10 @@ async fn context_propagation_across_nodes() {
         }"#,
     );
 
-    let result = executor().run(&graph).await.expect("pipeline should succeed");
+    let result = executor()
+        .run(&graph)
+        .await
+        .expect("pipeline should succeed");
 
     // The codergen handler sets "<node_id>.prompt" and "<node_id>.completed" in context_updates.
     // These should propagate through the engine into final_context.
@@ -378,10 +397,16 @@ async fn ten_node_linear_pipeline_completes() {
         .iter()
         .filter(|d| d.severity == attractor_pipeline::Severity::Error)
         .collect();
-    assert!(errors.is_empty(), "No validation errors expected: {errors:?}");
+    assert!(
+        errors.is_empty(),
+        "No validation errors expected: {errors:?}"
+    );
 
     // Execute
-    let result = executor().run(&graph).await.expect("pipeline should succeed");
+    let result = executor()
+        .run(&graph)
+        .await
+        .expect("pipeline should succeed");
 
     // Total: start + 8 steps + done = 10 nodes
     assert_eq!(
@@ -413,4 +438,3 @@ async fn ten_node_linear_pipeline_completes() {
         );
     }
 }
-

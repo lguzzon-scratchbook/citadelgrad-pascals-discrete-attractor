@@ -24,7 +24,10 @@ impl std::str::FromStr for LlmCliProvider {
             "codex" | "openai" => Ok(Self::Codex),
             "gemini" | "google" => Ok(Self::Gemini),
             other => {
-                tracing::warn!(provider = other, "Unknown llm_provider, defaulting to Claude");
+                tracing::warn!(
+                    provider = other,
+                    "Unknown llm_provider, defaulting to Claude"
+                );
                 Ok(Self::Claude)
             }
         }
@@ -185,8 +188,7 @@ pub(super) fn build_cli_command(cfg: &CliRunConfig<'_>) -> tokio::process::Comma
             if let Some(AttributeValue::String(tools)) = cfg.node.raw_attrs.get("allowed_tools") {
                 cmd.arg("--allowedTools").arg(tools);
             }
-            if let Some(AttributeValue::String(budget)) = cfg.node.raw_attrs.get("max_budget_usd")
-            {
+            if let Some(AttributeValue::String(budget)) = cfg.node.raw_attrs.get("max_budget_usd") {
                 cmd.arg("--max-budget-usd").arg(budget);
             }
             cmd

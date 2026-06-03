@@ -11,9 +11,9 @@ use anyhow;
 fn fnv1a32(bytes: &[u8]) -> u32 {
     const OFFSET: u32 = 2166136261;
     const PRIME: u32 = 16777619;
-    bytes.iter().fold(OFFSET, |acc, &b| {
-        (acc ^ (b as u32)).wrapping_mul(PRIME)
-    })
+    bytes
+        .iter()
+        .fold(OFFSET, |acc, &b| (acc ^ (b as u32)).wrapping_mul(PRIME))
 }
 
 fn stable_logs_dir(pipeline_path: &std::path::Path) -> PathBuf {

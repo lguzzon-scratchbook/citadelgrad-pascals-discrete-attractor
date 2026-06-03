@@ -3,7 +3,7 @@
 //! Implements the 5-phase lifecycle: parse, validate, initialize, execute, finalize.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use attractor_types::{AttractorError, Context, Outcome, Result, StageStatus};
 
@@ -55,6 +55,19 @@ fn status_to_string(status: StageStatus) -> String {
         StageStatus::Fail => "fail".to_string(),
         StageStatus::Skipped => "skipped".to_string(),
     }
+}
+
+async fn manifest_max_fix_iterations(context: &Context) -> Option<u32> {
+    let workdir = context
+        .get("workdir")
+        .await
+        .and_then(|v| v.as_str().map(PathBuf::from))
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+
+    attractor_quality::resolve(&workdir)
+        .ok()
+        .and_then(|resolved| resolved.manifest.quality)
+        .and_then(|quality| quality.max_fix_iterations)
 }
 
 // ---------------------------------------------------------------------------
@@ -127,9 +140,9 @@ impl PipelineExecutor {
         let mut prev_node_id: Option<String> = None;
 
         // Phase 4: Execute — check for checkpoint to resume from
-        let start = graph.start_node().ok_or_else(|| {
-            AttractorError::ValidationError("No start node found".into())
-        })?;
+        let start = graph
+            .start_node()
+            .ok_or_else(|| AttractorError::ValidationError("No start node found".into()))?;
         let mut current_node = start;
 
         // Safety limits from context (set by CLI flags)
@@ -163,6 +176,7 @@ impl PipelineExecutor {
                 total_cost = cp.total_cost;
                 quality_loop_counters = cp.quality_loop_counters;
                 quality_last_footprint = cp.quality_last_footprint;
+                prev_node_id = cp.previous_node_id;
                 // Jump to the node that was about to execute
                 current_node = graph.node(&cp.current_node_id).ok_or_else(|| {
                     AttractorError::Other(format!(
@@ -197,10 +211,7 @@ impl PipelineExecutor {
                 if !gate_result.all_satisfied {
                     if let Some(ref target) = gate_result.retry_target {
                         current_node = graph.node(target).ok_or_else(|| {
-                            AttractorError::Other(format!(
-                                "Retry target '{}' not found",
-                                target
-                            ))
+                            AttractorError::Other(format!("Retry target '{}' not found", target))
                         })?;
                         continue;
                     }
@@ -223,13 +234,14 @@ impl PipelineExecutor {
 
             // Execute handler
             let handler_type = self.registry.resolve_type(current_node);
-            let handler = self.registry.get(&handler_type).ok_or_else(|| {
-                AttractorError::HandlerError {
-                    handler: handler_type.clone(),
-                    node: current_node.id.clone(),
-                    message: format!("No handler registered for type '{}'", handler_type),
-                }
-            })?;
+            let handler =
+                self.registry
+                    .get(&handler_type)
+                    .ok_or_else(|| AttractorError::HandlerError {
+                        handler: handler_type.clone(),
+                        node: current_node.id.clone(),
+                        message: format!("No handler registered for type '{}'", handler_type),
+                    })?;
 
             // Quality loop control: track entries and enforce max_fix_iterations
             let is_quality = handler_type == "quality";
@@ -240,15 +252,16 @@ impl PipelineExecutor {
                 *counter += 1;
                 let iteration = *counter;
 
-                // Resolve max_fix_iterations: node attr → context → default 3
+                // Resolve max_fix_iterations: node attr → manifest → context → default 3
+                let manifest_max_iters = manifest_max_fix_iterations(&context).await;
+                let context_max_iters = context
+                    .get("quality_max_fix_iterations")
+                    .await
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n as u32);
                 let max_iters = match current_node.raw_attrs.get("max_fix_iterations") {
                     Some(attractor_dot::AttributeValue::Integer(n)) => *n as u32,
-                    _ => context
-                        .get("quality_max_fix_iterations")
-                        .await
-                        .and_then(|v| v.as_u64())
-                        .map(|n| n as u32)
-                        .unwrap_or(3),
+                    _ => manifest_max_iters.or(context_max_iters).unwrap_or(3),
                 };
 
                 if iteration > max_iters {
@@ -301,8 +314,7 @@ impl PipelineExecutor {
                 {
                     for r in results {
                         if let Some(fp) = r.get("failure_footprint").and_then(|v| v.as_str()) {
-                            quality_last_footprint
-                                .insert(current_node.id.clone(), fp.to_string());
+                            quality_last_footprint.insert(current_node.id.clone(), fp.to_string());
                             break;
                         }
                     }
@@ -314,7 +326,10 @@ impl PipelineExecutor {
             node_outcomes.insert(current_node.id.clone(), outcome.clone());
 
             // Track cost from this node
-            if let Some(cost) = outcome.context_updates.get(&format!("{}.cost_usd", current_node.id)) {
+            if let Some(cost) = outcome
+                .context_updates
+                .get(&format!("{}.cost_usd", current_node.id))
+            {
                 if let Some(c) = cost.as_f64() {
                     total_cost += c;
                     tracing::info!(
@@ -337,10 +352,7 @@ impl PipelineExecutor {
                 .await;
             if let Some(ref label) = outcome.preferred_label {
                 context
-                    .set(
-                        "preferred_label",
-                        serde_json::Value::String(label.clone()),
-                    )
+                    .set("preferred_label", serde_json::Value::String(label.clone()))
                     .await;
             }
 
@@ -374,8 +386,6 @@ impl PipelineExecutor {
                     if edge.loop_restart {
                         completed_nodes.clear();
                         node_outcomes.clear();
-                        quality_loop_counters.clear();
-                        quality_last_footprint.clear();
                     }
                     let next_id = edge.to.clone();
                     current_node = graph.node(&next_id).ok_or_else(|| {
@@ -393,6 +403,7 @@ impl PipelineExecutor {
                             total_cost,
                             quality_loop_counters.clone(),
                             quality_last_footprint.clone(),
+                            Some(just_completed.clone()),
                         );
                         save_checkpoint(&cp, logs).await?;
                     }

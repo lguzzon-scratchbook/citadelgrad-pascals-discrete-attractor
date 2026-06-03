@@ -80,9 +80,8 @@ pub fn select_edge<'a>(
 /// `[Y]`, `Y)`, `Y-`.
 fn normalize_label(label: &str) -> String {
     static RE: OnceLock<regex::Regex> = OnceLock::new();
-    let re = RE.get_or_init(|| {
-        regex::Regex::new(r"^(?:\[\w\]\s*|\w\)\s*|\w-\s*)").expect("valid regex")
-    });
+    let re = RE
+        .get_or_init(|| regex::Regex::new(r"^(?:\[\w\]\s*|\w\)\s*|\w-\s*)").expect("valid regex"));
     let s = label.trim().to_lowercase();
     re.replace(&s, "").to_string()
 }
@@ -90,7 +89,10 @@ fn normalize_label(label: &str) -> String {
 /// Pick the edge with the highest weight; break ties by lexicographically
 /// smallest `to` field.
 fn best_by_weight_then_lexical<'a>(edges: &[&'a PipelineEdge]) -> &'a PipelineEdge {
-    debug_assert!(!edges.is_empty(), "best_by_weight_then_lexical called with empty slice");
+    debug_assert!(
+        !edges.is_empty(),
+        "best_by_weight_then_lexical called with empty slice"
+    );
     edges
         .iter()
         .copied()

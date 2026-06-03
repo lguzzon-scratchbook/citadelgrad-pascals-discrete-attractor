@@ -390,12 +390,15 @@ impl ProviderAdapter for AnthropicAdapter {
             })?;
 
         let status = resp.status();
-        let response_body = resp.text().await.map_err(|e| AttractorError::ProviderError {
-            provider: "anthropic".into(),
-            status: 0,
-            message: e.to_string(),
-            retryable: true,
-        })?;
+        let response_body = resp
+            .text()
+            .await
+            .map_err(|e| AttractorError::ProviderError {
+                provider: "anthropic".into(),
+                status: 0,
+                message: e.to_string(),
+                retryable: true,
+            })?;
 
         if !status.is_success() {
             return Err(map_error(status, &response_body));
@@ -412,10 +415,7 @@ impl ProviderAdapter for AnthropicAdapter {
         parse_response(&json)
     }
 
-    fn stream(
-        &self,
-        _request: &Request,
-    ) -> Pin<Box<dyn Stream<Item = StreamEvent> + Send + '_>> {
+    fn stream(&self, _request: &Request) -> Pin<Box<dyn Stream<Item = StreamEvent> + Send + '_>> {
         Box::pin(tokio_stream::empty::<StreamEvent>())
     }
 

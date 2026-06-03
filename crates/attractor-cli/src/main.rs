@@ -412,10 +412,14 @@ async fn main() -> anyhow::Result<()> {
                 println!("Removed trust for: {}", path.display());
             }
             TrustAction::List => {
-                let entries = attractor_quality::list_trusted()
-                    .map_err(|e| anyhow::anyhow!("{e}"))?;
+                let entries =
+                    attractor_quality::list_trusted().map_err(|e| anyhow::anyhow!("{e}"))?;
                 for e in &entries {
-                    println!("{} ({})", e.path, &e.blake3_hash[..16.min(e.blake3_hash.len())]);
+                    println!(
+                        "{} ({})",
+                        e.path,
+                        &e.blake3_hash[..16.min(e.blake3_hash.len())]
+                    );
                 }
                 if entries.is_empty() {
                     println!("(no trusted manifests)");

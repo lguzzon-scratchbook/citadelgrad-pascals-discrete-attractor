@@ -38,8 +38,8 @@ pub use handlers::{
 pub use interviewer::{
     Answer, AutoApproveInterviewer, ConsoleInterviewer, Interviewer, Question, RecordingInterviewer,
 };
+pub use preflight::{run as preflight_run, PreflightFinding, Severity as PreflightSeverity};
 pub use retry::{execute_with_retry, BackoffPolicy};
 pub use stylesheet::{apply_stylesheet, parse_stylesheet, Declaration, Rule, Selector, Stylesheet};
 pub use transforms::{apply_transforms, expand_variables};
-pub use preflight::{run as preflight_run, PreflightFinding, Severity as PreflightSeverity};
 pub use validation::{validate, validate_or_raise, Diagnostic, LintRule, Severity};

@@ -182,9 +182,14 @@ async fn upsert_document_stores_content() {
         .await
         .expect("Failed to create project");
 
-    upsert_document(&pool, project.id, "prd", "# Product Requirements\n\nGoal: Build a thing")
-        .await
-        .expect("Failed to upsert document");
+    upsert_document(
+        &pool,
+        project.id,
+        "prd",
+        "# Product Requirements\n\nGoal: Build a thing",
+    )
+    .await
+    .expect("Failed to upsert document");
 
     let docs = get_documents(&pool, project.id)
         .await
@@ -192,7 +197,10 @@ async fn upsert_document_stores_content() {
 
     assert_eq!(docs.len(), 1);
     assert_eq!(docs[0].doc_type, "prd");
-    assert_eq!(docs[0].content, "# Product Requirements\n\nGoal: Build a thing");
+    assert_eq!(
+        docs[0].content,
+        "# Product Requirements\n\nGoal: Build a thing"
+    );
 }
 
 #[tokio::test]
