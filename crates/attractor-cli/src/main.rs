@@ -6,8 +6,8 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use commands::{
-    cmd_decompose, cmd_generate, cmd_generate_dir, cmd_info, cmd_launch, cmd_plan, cmd_run,
-    cmd_run_dir, cmd_scaffold, cmd_validate, validate_decomposition,
+    cmd_decompose, cmd_generate, cmd_generate_dir, cmd_info, cmd_init, cmd_launch, cmd_plan,
+    cmd_run, cmd_run_dir, cmd_scaffold, cmd_validate, validate_decomposition, InitOpts,
 };
 
 #[derive(Parser)]
@@ -150,6 +150,29 @@ enum Commands {
         /// Output .dot file or directory (default: pipelines/<spec-stem>.dot)
         #[arg(short, long)]
         output: Option<PathBuf>,
+    },
+
+    /// Initialise a pas.toml manifest in the current project.
+    ///
+    /// Detects toolchains (Rust, Node, Python, Go, Java) from the filesystem
+    /// and writes a starter manifest. In an interactive terminal the manifest
+    /// is opened in $EDITOR for preview/edit before writing.
+    Init {
+        /// Overwrite an existing pas.toml without prompting
+        #[arg(long)]
+        force: bool,
+
+        /// Disable interactive prompts (implied when stdin is not a TTY)
+        #[arg(long)]
+        non_interactive: bool,
+
+        /// Skip git-enrichment; detect toolchains from filesystem only
+        #[arg(long)]
+        no_enrich: bool,
+
+        /// Print the manifest that would be written without writing it
+        #[arg(long)]
+        dry_run: bool,
     },
 
     /// Generate, validate, and run pipelines end-to-end.
@@ -330,6 +353,20 @@ async fn main() -> anyhow::Result<()> {
                 cli.verbose,
             )
             .await?;
+        }
+        Commands::Init {
+            force,
+            non_interactive,
+            no_enrich,
+            dry_run,
+        } => {
+            let opts = InitOpts {
+                force,
+                non_interactive,
+                no_enrich,
+                dry_run,
+            };
+            cmd_init(&std::env::current_dir()?, &opts)?;
         }
     }
 
