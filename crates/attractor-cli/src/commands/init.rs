@@ -64,12 +64,6 @@ impl InitOpts {
     }
 }
 
-/// Returns `true` when we should show TUI prompts.
-fn is_interactive() -> bool {
-    std::io::stdin().is_terminal()
-        && std::env::var("PAS_NON_INTERACTIVE").as_deref() != Ok("1")
-        && std::env::var("PAS_AGENT").as_deref() != Ok("1")
-}
 
 // ---------------------------------------------------------------------------
 // Toolchain detection
@@ -113,14 +107,21 @@ fn build_manifest(root: &Path, toolchains: &[(&str, &str)]) -> String {
         .and_then(|n| n.to_str())
         .unwrap_or("my-project");
 
-    let toolchain_list = if toolchains.is_empty() {
-        "# (no toolchains detected)".to_string()
-    } else {
-        toolchains
+    // Emit the primary detected toolchain as [toolchain], matching the Manifest schema.
+    // Additional toolchains are listed as comments for human reference.
+    let toolchain_section = if let Some((primary_lang, _)) = toolchains.first() {
+        let extras: Vec<_> = toolchains[1..]
             .iter()
-            .map(|(name, _)| format!("  \"{name}\""))
-            .collect::<Vec<_>>()
-            .join(",\n")
+            .map(|(name, marker)| format!("# also detected: {name} ({marker})"))
+            .collect();
+        let comment_block = if extras.is_empty() {
+            String::new()
+        } else {
+            format!("\n{}", extras.join("\n"))
+        };
+        format!("[toolchain]\nlanguage = \"{primary_lang}\"{comment_block}\n")
+    } else {
+        "# no toolchains detected — add [toolchain] manually if needed\n".to_string()
     };
 
     format!(
@@ -131,14 +132,11 @@ fn build_manifest(root: &Path, toolchains: &[(&str, &str)]) -> String {
 name    = "{project_name}"
 version = "0.1.0"
 
-[toolchains]
-detected = [
-{toolchain_list}
-]
-
-[pipeline]
-default_max_steps  = 200
-default_max_budget = 10.0
+{toolchain_section}
+[quality]
+stages = []
+# Add your quality check commands here, e.g.:
+# stages = ["cargo test", "cargo clippy"]
 "#
     )
 }
@@ -199,7 +197,7 @@ pub fn cmd_init(root: &Path, opts: &InitOpts) -> anyhow::Result<()> {
     let mut manifest_content = build_manifest(root, &toolchains);
 
     // ── interactive preview / edit ──────────────────────────────────────────
-    if is_interactive() && !opts.dry_run {
+    if !opts.is_non_interactive() && !opts.dry_run {
         // Print detected toolchains summary
         if toolchains.is_empty() {
             println!("Detected: (none)");

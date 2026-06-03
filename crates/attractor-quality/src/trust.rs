@@ -85,14 +85,27 @@ fn save_store(store: &TrustStore) -> Result<(), TrustError> {
 
 pub fn is_trusted(path: &Path, blake3: &str) -> bool {
     if std::env::var("PAS_TRUST_THIS").as_deref() == Ok("1") {
+        tracing::warn!(
+            path = %path.display(),
+            hash = %&blake3[..blake3.len().min(16)],
+            "Trust check bypassed via PAS_TRUST_THIS — manifest is treated as trusted without verification"
+        );
         return true;
     }
     if std::env::var("PAS_AGENT").as_deref() == Ok("1") {
+        tracing::warn!(
+            path = %path.display(),
+            hash = %&blake3[..blake3.len().min(16)],
+            "Trust check bypassed via PAS_AGENT — manifest is treated as trusted without verification"
+        );
         return true;
     }
     let store = match load_store() {
         Ok(s) => s,
-        Err(_) => return false,
+        Err(e) => {
+            tracing::warn!(error = %e, "Failed to load trust store; treating manifest as untrusted");
+            return false;
+        }
     };
     store.entries.contains_key(&make_key(path, blake3))
 }
@@ -132,7 +145,7 @@ pub fn prompt_and_add(path: &Path, blake3: &str) -> Result<bool, TrustError> {
 
     eprintln!("pas: trust this manifest?");
     eprintln!("  path: {}", path.display());
-    eprintln!("  hash: {}", &blake3[..blake3.len().min(16)]);
+    eprintln!("  hash: {blake3}");
     eprint!("Trust? [y/N] ");
 
     let mut input = String::new();

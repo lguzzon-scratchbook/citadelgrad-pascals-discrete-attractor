@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -106,7 +106,10 @@ impl NodeHandler for QualityHandler {
                     stages_from_attr(node, node_id)?
                 }
             }
-            Err(_) => stages_from_attr(node, node_id)?,
+            Err(e) => {
+                tracing::debug!(node = %node_id, error = %e, "manifest resolution failed; falling back to quality_checks attribute");
+                stages_from_attr(node, node_id)?
+            }
         };
 
         let default_timeout = node
@@ -190,7 +193,14 @@ impl NodeHandler for QualityHandler {
             let stage_ok = output.status.success();
             let passed = stage_ok || stage.allow_failure;
 
-            let stderr_raw = String::from_utf8_lossy(&output.stderr);
+            // Cap stderr at 1 MB before UTF-8 conversion to bound memory usage.
+            const MAX_STDERR_BYTES: usize = 1024 * 1024;
+            let stderr_bytes = if output.stderr.len() > MAX_STDERR_BYTES {
+                &output.stderr[..MAX_STDERR_BYTES]
+            } else {
+                &output.stderr
+            };
+            let stderr_raw = String::from_utf8_lossy(stderr_bytes);
             let stderr_display = truncate_head_tail(&stderr_raw, HEAD_LINES, TAIL_LINES);
 
             // failure_footprint = blake3(stage_name || first_2KB(stderr))[..16]
@@ -344,14 +354,6 @@ pub(crate) fn truncate_head_tail(text: &str, head: usize, tail: usize) -> String
     let omitted = total - head - tail;
     let mut buf = lines[..head].join("\n");
     buf.push_str(&format!("\n... ({omitted} lines omitted) ...\n"));
-    // Ring buffer for the tail
-    let mut tail_buf: VecDeque<&str> = VecDeque::with_capacity(tail);
-    for line in &lines[head..] {
-        if tail_buf.len() == tail {
-            tail_buf.pop_front();
-        }
-        tail_buf.push_back(line);
-    }
-    buf.push_str(&tail_buf.make_contiguous().join("\n"));
+    buf.push_str(&lines[total - tail..].join("\n"));
     buf
 }

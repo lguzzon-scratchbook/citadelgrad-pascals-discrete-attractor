@@ -19,12 +19,7 @@ pub fn resolve(start_dir: &Path) -> Result<ResolvedManifest, ResolutionError> {
     loop {
         let candidate = current.join("pas.toml");
         if candidate.exists() {
-            let raw = std::fs::read(&candidate)
-                .map_err(|e| ResolutionError::Invalid {
-                    path: candidate.clone(),
-                    reason: e.to_string(),
-                })?;
-            let content = String::from_utf8(raw.clone())
+            let content = std::fs::read_to_string(&candidate)
                 .map_err(|e| ResolutionError::Invalid {
                     path: candidate.clone(),
                     reason: e.to_string(),
@@ -34,8 +29,7 @@ pub fn resolve(start_dir: &Path) -> Result<ResolvedManifest, ResolutionError> {
                     path: candidate.clone(),
                     source: e,
                 })?;
-            let hash = blake3::hash(&raw);
-            let blake3_hash = hash.to_hex().to_string();
+            let blake3_hash = blake3::hash(content.as_bytes()).to_hex().to_string();
             return Ok(ResolvedManifest { manifest, path: candidate, blake3_hash });
         }
 
