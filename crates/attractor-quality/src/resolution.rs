@@ -1,0 +1,114 @@
+use std::path::{Path, PathBuf};
+use thiserror::Error;
+use crate::manifest::{Manifest, ResolvedManifest};
+
+#[derive(Debug, Error)]
+pub enum ResolutionError {
+    #[error("pas.toml not found (searched up to 16 directory levels)")]
+    NotFound,
+    #[error("pas.toml at {path} is malformed: {source}")]
+    Malformed { path: PathBuf, source: toml::de::Error },
+    #[error("pas.toml at {path} is invalid: {reason}")]
+    Invalid { path: PathBuf, reason: String },
+}
+
+pub fn resolve(start_dir: &Path) -> Result<ResolvedManifest, ResolutionError> {
+    let mut current = start_dir.to_path_buf();
+    let mut ascents = 0;
+
+    loop {
+        let candidate = current.join("pas.toml");
+        if candidate.exists() {
+            let raw = std::fs::read(&candidate)
+                .map_err(|e| ResolutionError::Invalid {
+                    path: candidate.clone(),
+                    reason: e.to_string(),
+                })?;
+            let content = String::from_utf8(raw.clone())
+                .map_err(|e| ResolutionError::Invalid {
+                    path: candidate.clone(),
+                    reason: e.to_string(),
+                })?;
+            let manifest: Manifest = toml::from_str(&content)
+                .map_err(|e| ResolutionError::Malformed {
+                    path: candidate.clone(),
+                    source: e,
+                })?;
+            let hash = blake3::hash(&raw);
+            let blake3_hash = hash.to_hex().to_string();
+            return Ok(ResolvedManifest { manifest, path: candidate, blake3_hash });
+        }
+
+        // Stop if .git directory found (workspace root)
+        if current.join(".git").exists() {
+            break;
+        }
+
+        ascents += 1;
+        if ascents >= 16 {
+            break;
+        }
+
+        match current.parent() {
+            Some(parent) => current = parent.to_path_buf(),
+            None => break,
+        }
+    }
+
+    Err(ResolutionError::NotFound)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn write_valid_manifest(dir: &Path) {
+        fs::write(dir.join("pas.toml"), r#"
+[project]
+name = "test-project"
+
+[quality]
+stages = ["lint", "test"]
+"#).unwrap();
+    }
+
+    #[test]
+    fn resolves_manifest_in_same_dir() {
+        let tmp = TempDir::new().unwrap();
+        write_valid_manifest(tmp.path());
+        let result = resolve(tmp.path());
+        assert!(result.is_ok());
+        let r = result.unwrap();
+        assert_eq!(r.manifest.project.name, "test-project");
+        assert!(!r.blake3_hash.is_empty());
+    }
+
+    #[test]
+    fn resolves_manifest_in_parent_dir() {
+        let tmp = TempDir::new().unwrap();
+        write_valid_manifest(tmp.path());
+        let child = tmp.path().join("subdir");
+        fs::create_dir(&child).unwrap();
+        let result = resolve(&child);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn returns_not_found_for_empty_dir() {
+        let tmp = TempDir::new().unwrap();
+        // Create a .git dir to stop walk-up
+        fs::create_dir(tmp.path().join(".git")).unwrap();
+        let result = resolve(tmp.path());
+        assert!(matches!(result, Err(ResolutionError::NotFound)));
+    }
+
+    #[test]
+    fn returns_malformed_for_invalid_toml() {
+        let tmp = TempDir::new().unwrap();
+        fs::write(tmp.path().join("pas.toml"), "this is not valid toml!!!").unwrap();
+        let result = resolve(tmp.path());
+        assert!(matches!(result, Err(ResolutionError::Malformed { .. })));
+    }
+}
