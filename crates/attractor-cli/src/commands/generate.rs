@@ -371,6 +371,8 @@ pub async fn cmd_generate_dir(
     dir: &std::path::Path,
     output_dir: Option<&std::path::Path>,
     verbose: bool,
+    // ponytail: force=false skips existing .dot files so resume doesn't clobber valid checkpoints
+    force: bool,
 ) -> anyhow::Result<Vec<std::path::PathBuf>> {
     // Discover *-spec.md files, sorted
     let mut specs: Vec<std::path::PathBuf> = std::fs::read_dir(dir)?
@@ -438,6 +440,18 @@ pub async fn cmd_generate_dir(
         };
 
         let output_path = out_dir.join(format!("{}.dot", stem));
+
+        if !force && output_path.exists() {
+            println!(
+                "[{}/{}] {} (skipped — {} already exists; use --fresh to regenerate)",
+                i + 1,
+                specs.len(),
+                spec_path.file_name().unwrap_or_default().to_string_lossy(),
+                output_path.display()
+            );
+            generated.push(output_path);
+            continue;
+        }
 
         println!(
             "[{}/{}] {} {}→ {}",

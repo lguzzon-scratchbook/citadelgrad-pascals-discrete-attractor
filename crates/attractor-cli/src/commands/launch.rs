@@ -18,7 +18,7 @@ pub async fn cmd_launch(
 
     // Step 1: Generate .dot files from spec+prd pairs
     println!("=== Step 1: Generate pipelines ===\n");
-    let generated = super::cmd_generate_dir(docs_dir, Some(&pipelines_dir), verbose).await?;
+    let generated = super::cmd_generate_dir(docs_dir, Some(&pipelines_dir), verbose, fresh).await?;
 
     if generated.is_empty() {
         anyhow::bail!(

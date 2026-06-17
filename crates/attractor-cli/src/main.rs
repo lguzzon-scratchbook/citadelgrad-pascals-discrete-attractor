@@ -343,7 +343,7 @@ async fn main() -> anyhow::Result<()> {
         } => {
             // Check if the single positional arg is a directory
             if files.len() == 1 && files[0].is_dir() && prd.is_none() && spec.is_none() {
-                cmd_generate_dir(&files[0], output.as_deref(), cli.verbose).await?;
+                cmd_generate_dir(&files[0], output.as_deref(), cli.verbose, true).await?;
             } else {
                 // Resolve spec and prd from positional args and/or named flags.
                 let (resolved_prd, resolved_spec) = match (prd, spec, files.len()) {
