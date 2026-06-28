@@ -269,6 +269,21 @@ mod tests {
         assert_eq!(result, text.trim_end());
     }
 
+    #[test]
+    fn truncate_head_tail_exact_boundary_not_truncated() {
+        use crate::handlers::quality_handler::truncate_head_tail;
+
+        // Exactly head+tail lines: total <= head+tail → return unchanged.
+        // Mutation (< instead of <=): 10 < 10 = false → produces "(0 lines omitted)" marker.
+        let text: String = (1..=10).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
+        let result = truncate_head_tail(&text, 5, 5);
+        assert!(
+            !result.contains("omitted"),
+            "10 lines with head=5 tail=5 should not truncate, got: {result:?}"
+        );
+        assert_eq!(result, text.trim_end());
+    }
+
     // -----------------------------------------------------------------------
     // Test 10: manifest-driven stages run from [quality.stages]
     // -----------------------------------------------------------------------

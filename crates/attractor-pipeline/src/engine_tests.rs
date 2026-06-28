@@ -477,3 +477,291 @@ async fn budget_limit_aborts_pipeline() {
         "Expected budget error, got: {err}"
     );
 }
+
+// Test 11: Step limit does not abort at the exact boundary
+#[tokio::test]
+async fn step_limit_exact_boundary_does_not_abort() {
+    // start → done is exactly 2 steps; step_count reaches 2 and is checked as 2 > max_steps.
+    // max_steps=2: 2 > 2 = false → pipeline succeeds.
+    // Mutation (>= max_steps): 2 >= 2 = true → wrongly aborts.
+    let graph = parse_graph(
+        r#"digraph G {
+            start [shape="Mdiamond"]
+            done  [shape="Msquare"]
+            start -> done
+        }"#,
+    );
+    let context = Context::new();
+    context.set("max_steps", serde_json::json!(2u64)).await;
+    let result = test_executor().run_with_context(&graph, context).await;
+    assert!(
+        result.is_ok(),
+        "2 steps with max_steps=2 should succeed, got: {:?}",
+        result.unwrap_err()
+    );
+}
+
+// Test 12: Budget limit does not abort when cost exactly equals cap
+#[tokio::test]
+async fn budget_limit_exact_equality_does_not_abort() {
+    // A node reporting cost_usd equal to max_budget_usd should not abort.
+    // total_cost > max_budget: 2.0 > 2.0 = false → succeeds.
+    // Mutation (>= max_budget): 2.0 >= 2.0 = true → wrongly aborts.
+    use crate::graph::PipelineNode;
+
+    struct ExactCostHandler;
+
+    #[async_trait]
+    impl NodeHandler for ExactCostHandler {
+        fn handler_type(&self) -> &str {
+            "codergen"
+        }
+        async fn execute(
+            &self,
+            node: &PipelineNode,
+            _ctx: &Context,
+            _graph: &PipelineGraph,
+        ) -> Result<Outcome> {
+            let mut updates = HashMap::new();
+            updates.insert(
+                format!("{}.completed", node.id),
+                serde_json::Value::Bool(true),
+            );
+            updates.insert(format!("{}.cost_usd", node.id), serde_json::json!(2.0f64));
+            Ok(Outcome {
+                status: StageStatus::Success,
+                preferred_label: None,
+                suggested_next_ids: vec![],
+                context_updates: updates,
+                notes: "exact cost".into(),
+                failure_reason: None,
+            })
+        }
+    }
+
+    let graph = parse_graph(
+        r#"digraph G {
+            start [shape="Mdiamond"]
+            step  [shape="box", label="Step", prompt="work"]
+            done  [shape="Msquare"]
+            start -> step -> done
+        }"#,
+    );
+
+    let mut registry = HandlerRegistry::new();
+    registry.register(StartHandler);
+    registry.register(ExitHandler);
+    registry.register(ConditionalHandler);
+    registry.register(ExactCostHandler);
+
+    let context = Context::new();
+    context.set("max_budget_usd", serde_json::json!(2.0f64)).await;
+
+    let result = PipelineExecutor::new(registry)
+        .run_with_context(&graph, context)
+        .await;
+    assert!(
+        result.is_ok(),
+        "cost equal to budget should not abort, got: {:?}",
+        result.unwrap_err()
+    );
+}
+
+// Test 13: Quality loop aborts after max_fix_iterations, not before
+#[tokio::test]
+async fn quality_loop_fires_at_iteration_beyond_max_fix_iterations() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    struct AlwaysFailQualityHandler {
+        call_count: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl NodeHandler for AlwaysFailQualityHandler {
+        fn handler_type(&self) -> &str {
+            "quality"
+        }
+        async fn execute(
+            &self,
+            _node: &crate::graph::PipelineNode,
+            _ctx: &Context,
+            _graph: &PipelineGraph,
+        ) -> Result<Outcome> {
+            self.call_count.fetch_add(1, Ordering::SeqCst);
+            Ok(Outcome::fail("always fails"))
+        }
+    }
+
+    // fix → verify(fail) → fix(loop_restart) repeats; each re-entry of verify from fix
+    // increments the same loop key "verify::fix".
+    let graph = parse_graph(
+        r#"digraph G {
+            start  [shape="Mdiamond"]
+            fix    [shape="box", label="Fix", prompt="fix"]
+            verify [shape="box", type="quality", label="Verify", prompt="verify"]
+            done   [shape="Msquare"]
+            start -> fix -> verify
+            verify -> done [condition="outcome=success"]
+            verify -> fix  [condition="outcome=fail", loop_restart=true]
+        }"#,
+    );
+
+    let call_count = Arc::new(AtomicUsize::new(0));
+    let mut registry = HandlerRegistry::new();
+    registry.register(StartHandler);
+    registry.register(ExitHandler);
+    registry.register(ConditionalHandler);
+    registry.register(MockCodergenHandler); // handles "fix" node
+    registry.register(AlwaysFailQualityHandler {
+        call_count: call_count.clone(),
+    });
+
+    let context = Context::new();
+    // max_fix_iterations=1: iteration 1 runs handler; iteration 2 aborts before running it.
+    // Mutation (>= 1): iteration 1 aborts immediately → handler never called.
+    context
+        .set("quality_max_fix_iterations", serde_json::json!(1u64))
+        .await;
+
+    let result = PipelineExecutor::new(registry)
+        .run_with_context(&graph, context)
+        .await;
+
+    assert!(result.is_err(), "should abort after exceeding max_fix_iterations");
+    assert_eq!(
+        call_count.load(Ordering::SeqCst),
+        1,
+        "handler should execute exactly once (iter=1 runs, iter=2 aborts before executing)"
+    );
+}
+
+// Test 14: Retry warning injected when quality node re-enters on iteration 2
+// Note: the engine sleeps 1 second at iteration >= 2; this test takes ~1s.
+#[tokio::test]
+async fn quality_retry_warning_injected_on_second_iteration() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    struct FailOnceThenSucceedQualityHandler {
+        call_count: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl NodeHandler for FailOnceThenSucceedQualityHandler {
+        fn handler_type(&self) -> &str {
+            "quality"
+        }
+        async fn execute(
+            &self,
+            _node: &crate::graph::PipelineNode,
+            _ctx: &Context,
+            _graph: &PipelineGraph,
+        ) -> Result<Outcome> {
+            let prev = self.call_count.fetch_add(1, Ordering::SeqCst);
+            if prev == 0 {
+                Ok(Outcome::fail("first attempt fails"))
+            } else {
+                Ok(Outcome::success("retry succeeded"))
+            }
+        }
+    }
+
+    let graph = parse_graph(
+        r#"digraph G {
+            start  [shape="Mdiamond"]
+            fix    [shape="box", label="Fix", prompt="fix"]
+            verify [shape="box", type="quality", label="Verify", prompt="verify"]
+            done   [shape="Msquare"]
+            start -> fix -> verify
+            verify -> done [condition="outcome=success"]
+            verify -> fix  [condition="outcome=fail", loop_restart=true]
+        }"#,
+    );
+
+    let call_count = Arc::new(AtomicUsize::new(0));
+    let mut registry = HandlerRegistry::new();
+    registry.register(StartHandler);
+    registry.register(ExitHandler);
+    registry.register(ConditionalHandler);
+    registry.register(MockCodergenHandler);
+    registry.register(FailOnceThenSucceedQualityHandler {
+        call_count: call_count.clone(),
+    });
+
+    let context = Context::new();
+    // Allow 2 iterations so iter=2 passes the abort check and injects the warning.
+    context
+        .set("quality_max_fix_iterations", serde_json::json!(2u64))
+        .await;
+
+    let result = PipelineExecutor::new(registry)
+        .run_with_context(&graph, context)
+        .await
+        .expect("pipeline should succeed on second quality attempt");
+
+    let warning_key = "__quality_retry_warning::verify";
+    assert!(
+        result.final_context.contains_key(warning_key),
+        "retry warning must be in final_context at iteration 2; keys: {:?}",
+        result.final_context.keys().collect::<Vec<_>>()
+    );
+    let warning = result.final_context[warning_key].as_str().unwrap_or("");
+    assert!(
+        warning.contains("retry-warning"),
+        "warning should contain <retry-warning> sentinel, got: {warning:?}"
+    );
+}
+
+// Test 15: Handler returning Fail with no outgoing edge returns HandlerError
+#[tokio::test]
+async fn fail_handler_with_no_outgoing_edge_returns_handler_error() {
+    use crate::graph::PipelineNode;
+
+    struct FailHandler;
+
+    #[async_trait]
+    impl NodeHandler for FailHandler {
+        fn handler_type(&self) -> &str {
+            "codergen"
+        }
+        async fn execute(
+            &self,
+            _node: &PipelineNode,
+            _ctx: &Context,
+            _graph: &PipelineGraph,
+        ) -> Result<Outcome> {
+            Ok(Outcome::fail("dead end failure"))
+        }
+    }
+
+    // dead_end has zero outgoing edges (None branch fires when outcome=Fail).
+    // done is reachable via an impossible condition so validation passes.
+    let graph = parse_graph(
+        r#"digraph G {
+            start    [shape="Mdiamond"]
+            dead_end [shape="box", label="Dead End", prompt="will fail"]
+            done     [shape="Msquare"]
+            start -> dead_end
+            start -> done [condition="__never__=true"]
+        }"#,
+    );
+
+    let mut registry = HandlerRegistry::new();
+    registry.register(StartHandler);
+    registry.register(ExitHandler);
+    registry.register(ConditionalHandler);
+    registry.register(FailHandler);
+
+    let result = PipelineExecutor::new(registry).run(&graph).await;
+    assert!(result.is_err(), "fail with no outgoing edge should error");
+    match result.unwrap_err() {
+        AttractorError::HandlerError { message, .. } => {
+            assert!(
+                message.contains("no outgoing edge"),
+                "expected 'no outgoing edge' in error, got: {message}"
+            );
+        }
+        other => panic!("expected HandlerError, got: {other:?}"),
+    }
+}
