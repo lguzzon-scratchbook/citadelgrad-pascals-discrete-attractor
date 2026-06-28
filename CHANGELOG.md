@@ -2,6 +2,45 @@
 
 All notable changes to PAS are documented here.
 
+## [0.8.0] — 2026-06-27
+
+### Tests
+
+- Added 6 boundary-condition tests to `attractor-pipeline` closing mutation testing gaps (score: 67 % → ~85 %).
+  - `step_limit_exact_boundary_does_not_abort` — step cap uses strict `>`, not `>=`
+  - `budget_limit_exact_equality_does_not_abort` — cost equal to budget should not abort
+  - `quality_loop_fires_at_iteration_beyond_max_fix_iterations` — loop counter fires at N+1 entries, not N; handler call count asserted
+  - `quality_retry_warning_injected_on_second_iteration` — `__quality_retry_warning` context key verified at iteration 2
+  - `fail_handler_with_no_outgoing_edge_returns_handler_error` — Fail on a dead-end node returns `HandlerError`, not silent success
+  - `truncate_head_tail_exact_boundary_not_truncated` — exactly `head+tail` lines returns unchanged text
+
+## [0.7.2] — 2026-06-20
+
+### Added
+
+- **`QualityHandler`** — manifest-driven quality gate with env isolation, per-stage telemetry, head/tail output truncation, and failure footprint tracking (`attractor-quality`, `attractor-pipeline`).
+- **`pas.toml` manifest** — walk-up resolution from working directory; `[quality.stages]` drives quality checks without node attributes.
+- **Quality loop control** — engine enforces `max_fix_iterations`, injects `__quality_retry_warning` context on retry, checkpoints with `schema_version`.
+- **Preflight check** — warns when a quality node is present but no `pas.toml` manifest is found.
+- **Trust store** — `attractor-quality` records trust decisions; LLM enrichment stub and `pas trust` CLI commands.
+- **`pas init`** — toolchain detection, template emission, TUI confirmation dialog, `--yes` non-interactive mode.
+
+### Fixed
+
+- Skip `.dot` regeneration on checkpoint resume to protect already-valid pipeline files.
+- Hardened quality loop edge cases: footprint extraction, loop-counter key scoping, and cooldown sleep placement.
+- 7 correctness bugs found and fixed via fresh-eyes audit of the quality loop and engine flow.
+
+### Changed
+
+- `QualityHandler` exported from `attractor_pipeline` public API.
+- Code review refactoring pass for the attractor-5b8 feature branch.
+
+### Documentation
+
+- `docs/cli-reference.md` updated with `pas init` and quality handler node attributes.
+- Quality handler design spec and integration tests added.
+
 ## [0.7.1] — 2026-05-29
 
 ### Fixed
