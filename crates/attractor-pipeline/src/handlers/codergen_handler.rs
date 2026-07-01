@@ -12,11 +12,15 @@ use crate::handler::NodeHandler;
 // LlmCliProvider — which CLI tool to invoke for an LLM node
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 enum LlmCliProvider {
     Claude,
     Codex,
     Gemini,
+    Aivo {
+        alias: String,
+        aivo_key: Option<String>,
+    },
 }
 
 impl std::str::FromStr for LlmCliProvider {
@@ -27,6 +31,14 @@ impl std::str::FromStr for LlmCliProvider {
             "claude" | "anthropic" => Ok(Self::Claude),
             "codex" | "openai" => Ok(Self::Codex),
             "gemini" | "google" => Ok(Self::Gemini),
+            "aivo" => Ok(Self::Aivo {
+                alias: "claude".into(),
+                aivo_key: None,
+            }),
+            s if s.starts_with("aivo/") => Ok(Self::Aivo {
+                alias: s.trim_start_matches("aivo/").to_string(),
+                aivo_key: None,
+            }),
             other => {
                 tracing::warn!(
                     provider = other,
@@ -38,6 +50,14 @@ impl std::str::FromStr for LlmCliProvider {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AgentKind {
+    Claude,
+    Codex,
+    Gemini,
+    Unknown,
+}
+
 impl LlmCliProvider {
     fn from_node(node: &PipelineNode) -> Self {
         node.llm_provider
@@ -46,19 +66,35 @@ impl LlmCliProvider {
             .unwrap_or(Self::Claude)
     }
 
+    fn agent_kind(&self) -> AgentKind {
+        match self {
+            Self::Aivo { alias, .. } => match alias.as_str() {
+                "claude" | "anthropic" => AgentKind::Claude,
+                "codex" | "openai" => AgentKind::Codex,
+                "gemini" | "google" => AgentKind::Gemini,
+                _ => AgentKind::Unknown,
+            },
+            Self::Claude => AgentKind::Claude,
+            Self::Codex => AgentKind::Codex,
+            Self::Gemini => AgentKind::Gemini,
+        }
+    }
+
     fn binary_name(&self) -> &'static str {
         match self {
             Self::Claude => "claude",
             Self::Codex => "codex",
             Self::Gemini => "gemini",
+            Self::Aivo { .. } => "aivo",
         }
     }
 
-    fn display_name(&self) -> &'static str {
+    fn display_name(&self) -> String {
         match self {
-            Self::Claude => "Claude Code",
-            Self::Codex => "Codex CLI",
-            Self::Gemini => "Gemini CLI",
+            Self::Claude => "Claude Code".to_string(),
+            Self::Codex => "Codex CLI".to_string(),
+            Self::Gemini => "Gemini CLI".to_string(),
+            Self::Aivo { alias, .. } => format!("Aivo ({})", alias),
         }
     }
 }
@@ -166,6 +202,7 @@ struct NormalizedCliResult {
 
 struct CliRunConfig<'a> {
     provider: LlmCliProvider,
+    aivo_key: Option<&'a str>,
     prompt: &'a str,
     model: Option<&'a str>,
     workdir: Option<&'a str>,
@@ -175,7 +212,7 @@ struct CliRunConfig<'a> {
 }
 
 fn build_cli_command(cfg: &CliRunConfig<'_>) -> tokio::process::Command {
-    let mut cmd = match cfg.provider {
+    let mut cmd = match &cfg.provider {
         LlmCliProvider::Claude => {
             let mut cmd = tokio::process::Command::new("claude");
             cmd.arg("-p")
@@ -213,6 +250,68 @@ fn build_cli_command(cfg: &CliRunConfig<'_>) -> tokio::process::Command {
             cmd.arg(cfg.prompt);
             cmd
         }
+        LlmCliProvider::Aivo { alias, .. } => {
+            let mut cmd = tokio::process::Command::new("aivo");
+            cmd.arg(&alias);
+            if let Some(key) = cfg.aivo_key {
+                cmd.arg("-k").arg(key);
+            }
+            if let Some(model) = cfg.model {
+                cmd.arg("-m").arg(model);
+            }
+            match cfg.provider.agent_kind() {
+                AgentKind::Claude => {
+                    cmd.arg("-p")
+                        .arg(cfg.prompt)
+                        .arg("--output-format")
+                        .arg("json")
+                        .arg("--no-session-persistence")
+                        .arg("--dangerously-skip-permissions")
+                        .arg("--strict-mcp-config")
+                        .arg("--disable-slash-commands");
+                    if let Some(AttributeValue::String(tools)) =
+                        cfg.node.raw_attrs.get("allowed_tools")
+                    {
+                        cmd.arg("--allowedTools").arg(tools);
+                    }
+                    if let Some(AttributeValue::String(budget)) =
+                        cfg.node.raw_attrs.get("max_budget_usd")
+                    {
+                        cmd.arg("--max-budget-usd").arg(budget);
+                    }
+                }
+                AgentKind::Codex => {
+                    cmd.arg("--json")
+                        .arg("--yolo")
+                        .arg("--skip-git-repo-check")
+                        .arg("--ephemeral");
+                    if let Some(model) = cfg.model {
+                        cmd.arg("--model").arg(model);
+                    }
+                    if let Some(dir) = cfg.workdir {
+                        cmd.arg("--cd").arg(dir);
+                    }
+                    cmd.arg(cfg.prompt);
+                }
+                AgentKind::Gemini => {
+                    cmd.arg("--output-format")
+                        .arg("json")
+                        .arg("--approval-mode")
+                        .arg("yolo");
+                    if let Some(model) = cfg.model {
+                        cmd.arg("--model").arg(model);
+                    }
+                    cmd.arg(cfg.prompt);
+                }
+                AgentKind::Unknown => {
+                    // Unknown alias (opencode, pi, or user bundle alias):
+                    // aivo passes through to the underlying tool. No structured
+                    // output flags — send prompt as positional arg.
+                    cmd.arg(cfg.prompt);
+                }
+            }
+            cmd
+        }
         LlmCliProvider::Gemini => {
             let mut cmd = tokio::process::Command::new("gemini");
             cmd.arg("--output-format")
@@ -242,7 +341,7 @@ fn build_cli_command(cfg: &CliRunConfig<'_>) -> tokio::process::Command {
 // ---------------------------------------------------------------------------
 
 fn parse_cli_output(
-    provider: LlmCliProvider,
+    provider: &LlmCliProvider,
     stdout: &str,
     stderr: &str,
     node_id: &str,
@@ -264,6 +363,18 @@ fn parse_cli_output(
         LlmCliProvider::Claude => parse_claude_output(stdout, node_id),
         LlmCliProvider::Codex => parse_codex_output(stdout, node_id),
         LlmCliProvider::Gemini => parse_gemini_output(stdout, node_id),
+        LlmCliProvider::Aivo { .. } => match provider.agent_kind() {
+            AgentKind::Claude => parse_claude_output(stdout, node_id),
+            AgentKind::Codex => parse_codex_output(stdout, node_id),
+            AgentKind::Gemini => parse_gemini_output(stdout, node_id),
+            AgentKind::Unknown => Ok(NormalizedCliResult {
+                text: stdout.trim().to_string(),
+                is_error: false,
+                cost_usd: None,
+                turns: None,
+                raw_output: stdout.to_string(),
+            }),
+        },
     }
 }
 
@@ -361,14 +472,18 @@ fn parse_gemini_output(stdout: &str, node_id: &str) -> Result<NormalizedCliResul
 // ---------------------------------------------------------------------------
 // CodergenHandler — LLM task handler (box shape)
 //
-// Shells out to a CLI tool (Claude Code, Codex CLI, or Gemini CLI) for each
-// node, passing the node's prompt. The provider is selected via the
+// Shells out to a CLI tool (Claude Code, Codex CLI, Gemini CLI, or Aivo) for
+// each node, passing the node's prompt. The provider is selected via the
 // `llm_provider` node attribute (default: claude).
 //
 // Supported node attributes:
 //   - prompt (required): The task prompt sent to the CLI
-//   - llm_provider: "claude", "codex", or "gemini" (default: "claude")
+//   - llm_provider: "claude", "codex", "gemini", "aivo", or "aivo/<alias>"
+//     (default: "claude"; "aivo" routes through the aivo CLI for key + model
+//      management; known aliases like "aivo/claude" use structured output,
+//      unknown aliases like "aivo/pi" or user bundle aliases use raw stdout)
 //   - llm_model: Override the model (e.g. "sonnet", "o3", "gemini-2.5-pro")
+//   - llm_aivo_key: Saved key name for aivo (node or graph attr, e.g. "openrouter")
 //   - allowed_tools: Comma-separated tool list (Claude only)
 //   - max_budget_usd: Spending cap for this node (Claude only)
 //   - timeout: Duration before the CLI invocation is killed (default: 10m)
@@ -397,7 +512,7 @@ impl NodeHandler for CodergenHandler {
         tracing::info!(
             node = %node.id,
             label = %label,
-            provider = provider.display_name(),
+            provider = %provider.display_name(),
             "Executing codergen handler"
         );
 
@@ -409,7 +524,7 @@ impl NodeHandler for CodergenHandler {
             .unwrap_or(false);
 
         if dry_run {
-            tracing::info!(node = %node.id, provider = provider.display_name(), "Dry run — skipping CLI execution");
+            tracing::info!(node = %node.id, provider = %provider.display_name(), "Dry run — skipping CLI execution");
             return Ok(Outcome {
                 status: StageStatus::Success,
                 preferred_label: None,
@@ -492,6 +607,33 @@ impl NodeHandler for CodergenHandler {
                 _ => None,
             });
 
+        // Resolve aivo_key: node raw_attrs, then graph-level fallback
+        let aivo_key = if matches!(provider, LlmCliProvider::Aivo { .. }) {
+            node.raw_attrs
+                .get("llm_aivo_key")
+                .and_then(|v| match v {
+                    AttributeValue::String(s) => Some(s.clone()),
+                    _ => None,
+                })
+                .or_else(|| {
+                    match graph.attrs.get("llm_aivo_key") {
+                        Some(AttributeValue::String(s)) => Some(s.clone()),
+                        _ => None,
+                    }
+                })
+        } else {
+            None
+        };
+
+        // Warn if llm_aivo_key is set but provider is not aivo
+        if aivo_key.is_some() && !matches!(provider, LlmCliProvider::Aivo { .. }) {
+            tracing::warn!(
+                node = %node.id,
+                provider = %provider.display_name(),
+                "llm_aivo_key set but provider is not aivo — ignoring"
+            );
+        }
+
         // Resolve working directory from context
         let workdir = snapshot
             .get("workdir")
@@ -500,7 +642,8 @@ impl NodeHandler for CodergenHandler {
 
         // Build the CLI command via the provider-specific builder
         let mut cmd = build_cli_command(&CliRunConfig {
-            provider,
+            provider: provider.clone(),
+            aivo_key: aivo_key.as_deref(),
             prompt: &full_prompt,
             model,
             workdir: workdir.as_deref(),
@@ -511,8 +654,14 @@ impl NodeHandler for CodergenHandler {
         // Spawn the CLI process — detect missing binary
         let child = cmd.spawn().map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {
-                AttractorError::CliNotFound {
-                    binary: provider.binary_name().to_string(),
+                if matches!(provider, LlmCliProvider::Aivo { .. }) {
+                    AttractorError::CliNotFound {
+                        binary: "aivo (install: curl -fsSL https://getaivo.dev/install.sh | bash)".into(),
+                    }
+                } else {
+                    AttractorError::CliNotFound {
+                        binary: provider.binary_name().to_string(),
+                    }
                 }
             } else {
                 AttractorError::HandlerError {
@@ -575,11 +724,11 @@ impl NodeHandler for CodergenHandler {
         }
 
         // Parse output via the provider-specific parser
-        let cli_result = parse_cli_output(provider, &stdout, &stderr, &node.id)?;
+        let cli_result = parse_cli_output(&provider, &stdout, &stderr, &node.id)?;
 
         tracing::info!(
             node = %node.id,
-            provider = provider.display_name(),
+            provider = %provider.display_name(),
             is_error = cli_result.is_error,
             has_cost = cli_result.cost_usd.is_some(),
             "{} completed",
@@ -834,7 +983,7 @@ mod tests {
 
     #[test]
     fn parse_cli_output_empty_stdout_errors() {
-        let result = parse_cli_output(LlmCliProvider::Claude, "", "some error", "n");
+        let result = parse_cli_output(&LlmCliProvider::Claude, "", "some error", "n");
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -850,6 +999,7 @@ mod tests {
         let graph = make_minimal_graph();
         let cfg = CliRunConfig {
             provider: LlmCliProvider::Claude,
+            aivo_key: None,
             prompt: "test prompt",
             model: Some("sonnet"),
             workdir: None,
@@ -875,6 +1025,7 @@ mod tests {
         let graph = make_minimal_graph();
         let cfg = CliRunConfig {
             provider: LlmCliProvider::Codex,
+            aivo_key: None,
             prompt: "test prompt",
             model: None,
             workdir: Some("/tmp"),
@@ -901,6 +1052,7 @@ mod tests {
         let graph = make_minimal_graph();
         let cfg = CliRunConfig {
             provider: LlmCliProvider::Gemini,
+            aivo_key: None,
             prompt: "test prompt",
             model: Some("gemini-2.5-pro"),
             workdir: None,
@@ -966,4 +1118,131 @@ mod tests {
         let response = "This player is interesting but I need more data.";
         assert_eq!(extract_label(response, &labels), None);
     }
+
+    // --- Aivo provider ---
+
+    #[test]
+    fn provider_from_str_aivo() {
+        let p: LlmCliProvider = "aivo".parse().unwrap();
+        assert!(matches!(p, LlmCliProvider::Aivo { alias, aivo_key: None } if alias == "claude"));
+    }
+
+    #[test]
+    fn provider_from_str_aivo_with_alias() {
+        let p: LlmCliProvider = "aivo/codex".parse().unwrap();
+        assert!(matches!(p, LlmCliProvider::Aivo { ref alias, .. } if alias == "codex"));
+    }
+
+    #[test]
+    fn provider_from_str_aivo_custom_alias() {
+        let p: LlmCliProvider = "aivo/work".parse().unwrap();
+        assert!(matches!(p, LlmCliProvider::Aivo { ref alias, .. } if alias == "work"));
+    }
+
+    #[test]
+    fn provider_binary_name_aivo() {
+        let p = LlmCliProvider::Aivo { alias: "claude".into(), aivo_key: None };
+        assert_eq!(p.binary_name(), "aivo");
+    }
+
+    #[test]
+    fn provider_agent_kind_maps_correctly() {
+        let claude = LlmCliProvider::Aivo { alias: "claude".into(), aivo_key: None };
+        let codex = LlmCliProvider::Aivo { alias: "codex".into(), aivo_key: None };
+        let gemini = LlmCliProvider::Aivo { alias: "gemini".into(), aivo_key: None };
+        let pi     = LlmCliProvider::Aivo { alias: "pi".into(), aivo_key: None };
+        let anthropic = LlmCliProvider::Aivo { alias: "anthropic".into(), aivo_key: None };
+        assert!(matches!(claude.agent_kind(), AgentKind::Claude));
+        assert!(matches!(codex.agent_kind(), AgentKind::Codex));
+        assert!(matches!(gemini.agent_kind(), AgentKind::Gemini));
+        assert!(matches!(pi.agent_kind(), AgentKind::Unknown));
+        assert!(matches!(anthropic.agent_kind(), AgentKind::Claude));
+    }
+
+    #[test]
+    fn build_cli_command_aivo_claude_includes_key_and_model() {
+        let node = make_node("n", "box", Some("test"), HashMap::new());
+        let graph = make_minimal_graph();
+        let cfg = CliRunConfig {
+            provider: LlmCliProvider::Aivo { alias: "claude".into(), aivo_key: None },
+            aivo_key: Some("openrouter"),
+            prompt: "test prompt",
+            model: Some("sonnet"),
+            workdir: None,
+            node: &node,
+            graph: &graph,
+        };
+        let cmd = build_cli_command(&cfg);
+        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_str().unwrap()).collect();
+        assert_eq!(args[0], "claude");
+        assert!(args.contains(&"-k"));
+        assert!(args.contains(&"openrouter"));
+        assert!(args.contains(&"-m"));
+        assert!(args.contains(&"sonnet"));
+        assert!(args.contains(&"--output-format"));
+        assert!(args.contains(&"json"));
+    }
+
+    #[test]
+    fn build_cli_command_aivo_codex_uses_codex_flags() {
+        let node = make_node("n", "box", Some("test"), HashMap::new());
+        let graph = make_minimal_graph();
+        let cfg = CliRunConfig {
+            provider: LlmCliProvider::Aivo { alias: "codex".into(), aivo_key: None },
+            aivo_key: None,
+            prompt: "test prompt",
+            model: None,
+            workdir: Some("/tmp"),
+            node: &node,
+            graph: &graph,
+        };
+        let cmd = build_cli_command(&cfg);
+        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_str().unwrap()).collect();
+        assert_eq!(args[0], "codex");
+        assert!(args.contains(&"--json"));
+        assert!(args.contains(&"--yolo"));
+        assert_eq!(args.last(), Some(&"test prompt"));
+    }
+
+    #[test]
+    fn build_cli_command_aivo_unknown_alias_prompt_positional() {
+        let node = make_node("n", "box", Some("test"), HashMap::new());
+        let graph = make_minimal_graph();
+        let cfg = CliRunConfig {
+            provider: LlmCliProvider::Aivo { alias: "pi".into(), aivo_key: None },
+            aivo_key: None,
+            prompt: "test prompt",
+            model: None,
+            workdir: None,
+            node: &node,
+            graph: &graph,
+        };
+        let cmd = build_cli_command(&cfg);
+        let args: Vec<_> = cmd.as_std().get_args().map(|a| a.to_str().unwrap()).collect();
+        assert_eq!(args[0], "pi");
+        assert!(args.contains(&"test prompt"));
+        assert!(!args.contains(&"--output-format"));
+    }
+
+    #[test]
+    fn parse_cli_output_aivo_claude_uses_claude_parser() {
+        let json = r#"{"result":"Hello","is_error":false,"subtype":"","total_cost_usd":0.05,"num_turns":1}"#;
+        let result = parse_cli_output(
+            &LlmCliProvider::Aivo { alias: "claude".into(), aivo_key: None },
+            json, "", "n"
+        ).unwrap();
+        assert_eq!(result.text, "Hello");
+        assert_eq!(result.cost_usd, Some(0.05));
+    }
+
+    #[test]
+    fn parse_cli_output_aivo_unknown_returns_raw() {
+        let result = parse_cli_output(
+            &LlmCliProvider::Aivo { alias: "pi".into(), aivo_key: None },
+            "some raw output", "", "n"
+        ).unwrap();
+        assert_eq!(result.text, "some raw output");
+        assert_eq!(result.cost_usd, None);
+    }
+
 }
